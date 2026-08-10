@@ -8,4 +8,14 @@ enum CaseStatus: string
     case LinkDibuka = 'link_dibuka';
     case Terverifikasi = 'terverifikasi';
     case Ditutup = 'ditutup';
+
+    public function label(): string
+    {
+        return match ($this) {
+            self::Aktif => 'Aktif',
+            self::LinkDibuka => 'Link dibuka',
+            self::Terverifikasi => 'Terverifikasi',
+            self::Ditutup => 'Ditutup',
+        };
+    }
 }

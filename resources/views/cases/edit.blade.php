@@ -12,7 +12,13 @@
                     <form method="POST" action="{{ route('cases.update', ['case' => $case->getRouteKey()]) }}" class="space-y-6">
                         @csrf
                         @method('PUT')
-                        @include('cases._form', ['case' => $case])
+                        @include('cases._form', [
+                            'case' => $case,
+                            'form' => [
+                                'templateId' => (string) old('template_id', $case->template_id ?? ''),
+                                'fields' => old('fields', $case->fields ?? []),
+                            ],
+                        ])
 
                         <div class="flex items-center gap-4">
                             <x-primary-button>{{ __('Simpan') }}</x-primary-button>

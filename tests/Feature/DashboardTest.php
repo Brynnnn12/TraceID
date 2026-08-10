@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\ActivityType;
+use App\Enums\CaseStatus;
 use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
 use App\Models\ActivityLog;
@@ -34,6 +35,36 @@ test('dashboard shows the statistics widgets', function () {
                 && $statistics['verifications_today'] === 3
                 && $statistics['locations_recorded'] === 2
                 && $statistics['photos_recorded'] === 1;
+        });
+});
+
+test('dashboard provides chart data for the last 7 days', function () {
+    Verification::factory()->count(2)->create(['created_at' => now()]);
+    Verification::factory()->create(['created_at' => now()->subDays(3)]);
+
+    $this->actingAs($this->user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertViewHas('verificationsChart', function (array $chart) {
+            return count($chart['labels']) === 7
+                && count($chart['data']) === 7
+                && array_sum($chart['data']) === 3
+                && $chart['data'][6] === 2
+                && $chart['data'][3] === 1;
+        });
+});
+
+test('dashboard provides case data grouped by status', function () {
+    CaseFile::factory()->create(['status' => CaseStatus::Aktif]);
+    CaseFile::factory()->create(['status' => CaseStatus::Aktif]);
+    CaseFile::factory()->create(['status' => CaseStatus::Terverifikasi]);
+
+    $this->actingAs($this->user)
+        ->get(route('dashboard'))
+        ->assertOk()
+        ->assertViewHas('statusChart', function (array $chart) {
+            return $chart['labels'] === ['Aktif', 'Link dibuka', 'Terverifikasi', 'Ditutup']
+                && $chart['data'] === [2, 0, 1, 0];
         });
 });
 

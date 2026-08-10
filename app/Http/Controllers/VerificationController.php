@@ -7,6 +7,7 @@ use App\Exceptions\VerificationLinkException;
 use App\Http\Requests\StoreVerificationRequest;
 use App\Models\Verification;
 use App\Services\VerificationService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
 class VerificationController extends Controller
@@ -45,10 +46,13 @@ class VerificationController extends Controller
         return view('verification.success', ['case' => $case, 'verification' => $verification]);
     }
 
-    public function photo(Verification $verification)
+    public function photo(Request $request, Verification $verification)
     {
-        abort_if($verification->photo_path === null, 404);
+        $paths = $verification->photo_paths ?? [];
+        $photoIndex = (int) $request->query('photo', 0);
 
-        return Storage::disk('private')->response($verification->photo_path);
+        abort_if($paths === [] || ! array_key_exists($photoIndex, $paths), 404);
+
+        return Storage::disk('private')->response($paths[$photoIndex]);
     }
 }

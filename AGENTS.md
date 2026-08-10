@@ -130,10 +130,12 @@ cases
   amount, notes, token, status, expires_at, created_at, updated_at
 
 verifications
-  id, case_id, photo_path, latitude, longitude, accuracy, ip_address,
+  id, case_id, photo_paths, latitude, longitude, accuracy, ip_address,
   browser, operating_system, device_type, language, timezone,
   screen_resolution, user_agent, photo_status, location_status, created_at
 ```
+
+> `photo_paths` adalah JSON array (nullable) yang menampung hingga 3 path foto (PRD §5.6).
 
 Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `database-schema`, jangan hanya mengandalkan tabel di atas (bisa saja sudah berubah).
 

@@ -11,7 +11,12 @@
                 <div class="p-6 text-gray-900">
                     <form method="POST" action="{{ route('cases.store') }}" class="space-y-6">
                         @csrf
-                        @include('cases._form')
+                        @include('cases._form', [
+                            'form' => [
+                                'templateId' => (string) old('template_id', ''),
+                                'fields' => old('fields', []),
+                            ],
+                        ])
 
                         <div class="flex items-center gap-4">
                             <x-primary-button>{{ __('Simpan') }}</x-primary-button>

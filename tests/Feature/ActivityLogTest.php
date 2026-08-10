@@ -3,16 +3,22 @@
 use App\Enums\ActivityType;
 use App\Enums\CaseStatus;
 use App\Models\CaseFile;
+use App\Models\VerificationTemplate;
 use App\Services\CaseService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
 test('creating a case records a link_dibuat activity', function () {
+    $template = VerificationTemplate::factory()->create();
+
     $case = app(CaseService::class)->create([
-        'target_name' => 'Budi Santoso',
-        'bank_name' => 'BCA',
-        'account_number' => '1234567890',
-        'amount' => 100000,
+        'template_id' => $template->id,
+        'fields' => [
+            'target_name' => 'Budi Santoso',
+            'bank_name' => 'BCA',
+            'account_number' => '1234567890',
+            'amount' => 100000,
+        ],
     ]);
 
     expect($case->activities()->where('activity', ActivityType::LinkDibuat)->count())->toBe(1);

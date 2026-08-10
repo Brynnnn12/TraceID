@@ -54,7 +54,10 @@ class VerificationService
     public function recordVerification(CaseFile $case, array $validated, Request $request): Verification
     {
         return DB::transaction(function () use ($case, $validated, $request): Verification {
-            $photo = $this->photoService->store($request->file('photo'));
+            $photos = $request->file('photo');
+            $photos = is_array($photos) ? $photos : [$photos];
+
+            $photo = $this->photoService->store(array_filter($photos));
 
             $photoStatus = $photo['photo_status'] ?? null;
 
@@ -63,7 +66,7 @@ class VerificationService
             }
 
             $verification = $case->verifications()->create([
-                'photo_path' => $photo['photo_path'] ?? null,
+                'photo_paths' => $photo['photo_paths'] ?? null,
                 'photo_status' => $photoStatus,
                 'latitude' => $validated['latitude'] ?? null,
                 'longitude' => $validated['longitude'] ?? null,

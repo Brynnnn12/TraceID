@@ -21,7 +21,7 @@ class Verification extends Model
      */
     protected $fillable = [
         'case_id',
-        'photo_path',
+        'photo_paths',
         'latitude',
         'longitude',
         'accuracy',
@@ -43,6 +43,7 @@ class Verification extends Model
     protected function casts(): array
     {
         return [
+            'photo_paths' => 'array',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
             'accuracy' => 'decimal:2',

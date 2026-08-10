@@ -99,7 +99,7 @@ test('a case cannot be verified twice', function () {
     $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.5'])
         ->post(route('verification.store', $case->token))
         ->assertOk()
-        ->assertSee('Transaksi Sudah Diverifikasi');
+        ->assertSee('Sudah Diverifikasi');
 
     expect($case->fresh()->verifications()->count())->toBe(1);
 });
@@ -118,23 +118,51 @@ test('verification store is rate limited', function () {
         ->assertStatus(429);
 });
 
-test('visitor can submit a verification with a photo', function () {
+test('visitor can submit a verification with up to three photos', function () {
     Storage::fake('private');
 
     $case = CaseFile::factory()->create();
 
     $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.1'])
         ->post(route('verification.store', $case->token), [
-            'photo' => UploadedFile::fake()->image('selfie.jpg', 400, 400),
+            'photo' => [
+                UploadedFile::fake()->image('foto-1.jpg', 400, 400),
+                UploadedFile::fake()->image('foto-2.jpg', 400, 400),
+                UploadedFile::fake()->image('foto-3.jpg', 400, 400),
+            ],
         ])
         ->assertOk();
 
     $verification = $case->fresh()->verifications()->first();
 
     expect($verification->photo_status)->toBe(PhotoStatus::Diberikan)
-        ->and($verification->photo_path)->not->toBeNull();
+        ->and($verification->photo_paths)->toHaveCount(3);
 
-    Storage::disk('private')->assertExists($verification->photo_path);
+    foreach ($verification->photo_paths as $path) {
+        Storage::disk('private')->assertExists($path);
+    }
+});
+
+test('only the first three photos are kept', function () {
+    Storage::fake('private');
+
+    $case = CaseFile::factory()->create();
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.5'])
+        ->post(route('verification.store', $case->token), [
+            'photo' => [
+                UploadedFile::fake()->image('foto-1.jpg', 400, 400),
+                UploadedFile::fake()->image('foto-2.jpg', 400, 400),
+                UploadedFile::fake()->image('foto-3.jpg', 400, 400),
+                UploadedFile::fake()->image('foto-4.jpg', 400, 400),
+            ],
+        ])
+        ->assertOk();
+
+    $verification = $case->fresh()->verifications()->first();
+
+    expect($verification->photo_status)->toBe(PhotoStatus::Diberikan)
+        ->and($verification->photo_paths)->toHaveCount(3);
 });
 
 test('an invalid photo does not block the verification', function () {
@@ -142,14 +170,14 @@ test('an invalid photo does not block the verification', function () {
 
     $this->withServerVariables(['REMOTE_ADDR' => '10.0.1.2'])
         ->post(route('verification.store', $case->token), [
-            'photo' => UploadedFile::fake()->create('photo.txt', 100),
+            'photo' => [UploadedFile::fake()->create('photo.txt', 100)],
         ])
         ->assertOk();
 
     $verification = $case->fresh()->verifications()->first();
 
     expect($verification->photo_status)->toBe(PhotoStatus::Gagal)
-        ->and($verification->photo_path)->toBeNull();
+        ->and($verification->photo_paths)->toBeNull();
 });
 
 test('a denied camera permission is recorded as photo_status ditolak', function () {
@@ -183,13 +211,13 @@ test('a denied location permission is recorded as location_status ditolak', func
 test('admin can view the stored verification photo via signed url', function () {
     Storage::fake('private');
 
-    $photo = UploadedFile::fake()->image('selfie.jpg', 400, 400);
+    $photo = UploadedFile::fake()->image('foto-1.jpg', 400, 400);
     $path = Storage::disk('private')->putFile('verifications', $photo);
 
-    $verification = Verification::factory()->create(['photo_path' => $path]);
+    $verification = Verification::factory()->create(['photo_paths' => [$path]]);
 
     $this->actingAs(User::factory()->create())
-        ->get(URL::signedRoute('verification.photo', ['verification' => $verification->id]))
+        ->get(URL::signedRoute('verification.photo', ['verification' => $verification->id, 'photo' => 0]))
         ->assertOk();
 });
 
@@ -198,5 +226,18 @@ test('verification photo without a stored path is not accessible', function () {
 
     $this->actingAs(User::factory()->create())
         ->get(URL::signedRoute('verification.photo', ['verification' => $verification->id]))
+        ->assertNotFound();
+});
+
+test('an out of range photo index is not accessible', function () {
+    Storage::fake('private');
+
+    $photo = UploadedFile::fake()->image('foto-1.jpg', 400, 400);
+    $path = Storage::disk('private')->putFile('verifications', $photo);
+
+    $verification = Verification::factory()->create(['photo_paths' => [$path]]);
+
+    $this->actingAs(User::factory()->create())
+        ->get(URL::signedRoute('verification.photo', ['verification' => $verification->id, 'photo' => 3]))
         ->assertNotFound();
 });

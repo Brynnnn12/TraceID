@@ -16,6 +16,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(VerificationTemplateSeeder::class);
+
         User::factory()->create([
             'name' => env('ADMIN_NAME', 'Admin TraceID'),
             'email' => env('ADMIN_EMAIL', 'admin@traceid.test'),

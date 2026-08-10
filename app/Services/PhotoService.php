@@ -8,28 +8,39 @@ use Illuminate\Support\Facades\Validator;
 
 class PhotoService
 {
+    public const MAX_PHOTOS = 3;
+
     /**
-     * Validate and store an uploaded photo to the private disk.
+     * Validate and store up to three uploaded photos to the private disk.
      *
-     * @return array{photo_path: string|null, photo_status: PhotoStatus|null}
+     * @param  list<UploadedFile>  $photos
+     * @return array{photo_paths: list<string>|null, photo_status: PhotoStatus|null}
      */
-    public function store(?UploadedFile $photo): array
+    public function store(array $photos): array
     {
-        if ($photo === null) {
-            return ['photo_path' => null, 'photo_status' => null];
+        $photos = array_slice(array_values($photos), 0, self::MAX_PHOTOS);
+
+        if ($photos === []) {
+            return ['photo_paths' => null, 'photo_status' => null];
         }
 
-        $validator = Validator::make(['photo' => $photo], [
-            'photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120'],
-        ]);
+        $paths = [];
 
-        if ($validator->fails()) {
-            return ['photo_path' => null, 'photo_status' => PhotoStatus::Gagal];
+        foreach ($photos as $photo) {
+            $validator = Validator::make(['photo' => $photo], [
+                'photo' => ['image', 'mimes:jpeg,png,webp', 'max:5120'],
+            ]);
+
+            if ($validator->fails()) {
+                continue;
+            }
+
+            $paths[] = $photo->store('verifications', 'private');
         }
 
         return [
-            'photo_path' => $photo->store('verifications', 'private'),
-            'photo_status' => PhotoStatus::Diberikan,
+            'photo_paths' => $paths === [] ? null : $paths,
+            'photo_status' => $paths === [] ? PhotoStatus::Gagal : PhotoStatus::Diberikan,
         ];
     }
 }

@@ -8,7 +8,7 @@ test('visitor can open a valid verification link', function () {
 
     $this->get(route('verification.show', $case->token))
         ->assertOk()
-        ->assertSee($case->target_name)
+        ->assertSee($case->fieldValue('target_name'))
         ->assertSee($case->reference_number);
 });
 
@@ -56,7 +56,7 @@ test('already verified link shows a read-only summary', function () {
 
     $this->get(route('verification.show', $case->token))
         ->assertOk()
-        ->assertSee('Transaksi Sudah Diverifikasi')
+        ->assertSee('Sudah Diverifikasi')
         ->assertSee($case->reference_number)
         ->assertDontSee('Nama Pengirim');
 });

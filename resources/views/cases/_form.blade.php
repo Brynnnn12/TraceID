@@ -1,31 +1,50 @@
-<div>
+<div x-data="{
+    templateId: @js((string) $form['templateId']),
+    fields: @js($form['fields']),
+}">
     <div>
-        <x-input-label for="target_name" :value="__('Nama Target')" />
-        <x-text-input id="target_name" name="target_name" type="text" class="mt-1 block w-full"
-                      :value="old('target_name', $case->target_name ?? null)" required autofocus />
-        <x-input-error :messages="$errors->get('target_name')" class="mt-2" />
+        <x-input-label for="template_id" :value="__('Template Verifikasi')" />
+        <select id="template_id" name="template_id" x-model="templateId" required
+                class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm">
+            <option value="" disabled>{{ __('Pilih template') }}</option>
+            @foreach ($templates as $template)
+                <option value="{{ $template->id }}"
+                    @if ((string) old('template_id', $case->template_id ?? '') === (string) $template->id) selected @endif>
+                    {{ $template->name }}
+                </option>
+            @endforeach
+        </select>
+        <x-input-error :messages="$errors->get('template_id')" class="mt-2" />
     </div>
 
-    <div class="mt-4">
-        <x-input-label for="bank_name" :value="__('Nama Bank')" />
-        <x-text-input id="bank_name" name="bank_name" type="text" class="mt-1 block w-full"
-                      :value="old('bank_name', $case->bank_name ?? null)" required />
-        <x-input-error :messages="$errors->get('bank_name')" class="mt-2" />
-    </div>
+    @foreach ($templates as $template)
+        <div x-show="templateId == {{ $template->id }}" x-cloak class="mt-4">
+            <p class="text-sm font-medium text-gray-500">{{ __('Detail '.$template->name) }}</p>
 
-    <div class="mt-4">
-        <x-input-label for="account_number" :value="__('Nomor Rekening')" />
-        <x-text-input id="account_number" name="account_number" type="text" class="mt-1 block w-full"
-                      :value="old('account_number', $case->account_number ?? null)" required />
-        <x-input-error :messages="$errors->get('account_number')" class="mt-2" />
-    </div>
+            @foreach ($template->fields() as $field)
+                <div class="mt-4">
+                    <x-input-label for="field-{{ $template->id }}-{{ $field['key'] }}" :value="$field['label']" />
 
-    <div class="mt-4">
-        <x-input-label for="amount" :value="__('Jumlah Transfer (Rp)')" />
-        <x-text-input id="amount" name="amount" type="number" step="0.01" min="0" class="mt-1 block w-full"
-                      :value="old('amount', $case->amount ?? null)" required />
-        <x-input-error :messages="$errors->get('amount')" class="mt-2" />
-    </div>
+                    @if ($field['type'] === 'textarea')
+                        <textarea id="field-{{ $template->id }}-{{ $field['key'] }}"
+                                  name="fields[{{ $field['key'] }}]"
+                                  x-model="fields['{{ $field['key'] }}']"
+                                  rows="3"
+                                  class="mt-1 block w-full border-gray-300 focus:border-indigo-500 focus:ring-indigo-500 rounded-md shadow-sm"></textarea>
+                    @else
+                        <x-text-input id="field-{{ $template->id }}-{{ $field['key'] }}"
+                                      name="fields[{{ $field['key'] }}]"
+                                      type="{{ $field['type'] }}"
+                                      x-model="fields['{{ $field['key'] }}']"
+                                      class="mt-1 block w-full"
+                                      @if ($field['type'] === 'number') step="0.01" min="0" @endif />
+                    @endif
+
+                    <x-input-error :messages="$errors->get('fields.'.$field['key'])" class="mt-2" />
+                </div>
+            @endforeach
+        </div>
+    @endforeach
 
     <div class="mt-4">
         <x-input-label for="notes" :value="__('Catatan')" />

@@ -12,6 +12,8 @@ class DashboardController extends Controller
     {
         return view('dashboard', [
             'statistics' => $this->dashboardService->statistics(),
+            'verificationsChart' => $this->dashboardService->verificationsLast7Days(),
+            'statusChart' => $this->dashboardService->casesByStatus(),
             'activities' => $this->dashboardService->recentActivities(),
         ]);
     }

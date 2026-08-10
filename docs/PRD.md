@@ -2,7 +2,7 @@
 
 # TraceID – Sistem Dokumentasi dan Verifikasi Bukti Digital Transaksi
 
-Versi: 1.1 (MVP)
+Versi: 1.3 (MVP)
 Platform: Web Application
 Framework: Laravel 13 + Breeze + MySQL + Tailwind CSS + Alpine.js
 
@@ -41,6 +41,7 @@ Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi sec
 * Dashboard.
 * Manajemen kasus.
 * Link verifikasi unik (dengan opsi regenerate/nonaktifkan).
+* Verification template engine (satu kasus memilih satu template verifikasi).
 * Verifikasi transaksi satu klik (tanpa input manual).
 * Pencatatan metadata perangkat.
 * Lokasi (dengan izin).
@@ -112,6 +113,7 @@ Aktivitas terbaru (feed):
 Data kasus:
 
 * Nomor referensi otomatis, format `TRC-YYYYMMDD-0001`.
+* Template verifikasi (dipilih saat membuat kasus).
 * Nama target.
 * Nama bank.
 * Nomor rekening.
@@ -126,7 +128,7 @@ Status kasus dan transisinya:
 |---|---|---|
 | `aktif` | Kasus dibuat, link belum pernah dibuka | Setelah kasus & token dibuat |
 | `link_dibuka` | Pengunjung sudah membuka halaman verifikasi minimal 1x, belum klik konfirmasi | Kunjungan pertama ke `/verify/{token}` |
-| `terverifikasi` | Pengunjung berhasil klik konfirmasi transfer | Aksi konfirmasi sukses |
+| `terverifikasi` | Pengunjung berhasil klik tombol konfirmasi sesuai template | Aksi konfirmasi sukses |
 | `ditutup` | Admin menutup kasus secara manual (tidak ada aktivitas lanjutan yang mungkin) | Aksi admin |
 | `kedaluwarsa` *(implisit, ditentukan dari `expires_at`, bukan kolom status terpisah)* | Token sudah lewat 24 jam dan kasus belum `terverifikasi` | Dicek saat token diakses |
 
@@ -135,6 +137,7 @@ Catatan: `kedaluwarsa` tidak wajib jadi nilai kolom `status` — cukup dihitung 
 Fitur:
 
 * Tambah, edit, hapus, lihat detail kasus.
+* Pilih template verifikasi saat membuat/mengubah kasus.
 * Regenerate link (membuat token baru + reset `expires_at`, hanya bisa dilakukan sebelum `terverifikasi`).
 * Nonaktifkan link (set `status = ditutup` tanpa menghapus data kasus/riwayat).
 
@@ -171,32 +174,56 @@ Halaman ini dapat diakses tanpa login, selama token valid.
 | Kasus berstatus `ditutup` | "Link ini sudah tidak aktif." |
 | Kasus berstatus `terverifikasi` | Tampilkan ringkasan konfirmasi (read-only), bukan error. |
 
-Informasi yang ditampilkan (untuk token valid, belum diverifikasi):
+Informasi yang ditampilkan (untuk token valid, belum diverifikasi) ditentukan oleh template yang dipilih pada kasus.
 
-* Nama penerima.
-* Nama bank.
-* Nomor rekening.
-* Jumlah transfer.
-* Nomor referensi.
+Contoh:
 
-Tombol utama: **Konfirmasi Transfer**
+* Template konfirmasi transfer: nama bank, nomor rekening, jumlah transfer, tombol **Konfirmasi Transfer**.
+* Template konfirmasi penerimaan barang: nomor resi, nama penerima, alamat, tombol **Konfirmasi Penerimaan**.
+* Template verifikasi identitas: nama, nomor referensi, tujuan verifikasi, tombol **Konfirmasi Identitas**.
+
+Tombol utama mengikuti template aktif, tetapi perilaku backend tetap sama (one-click confirm).
 
 Alur interaksi publik dibuat sesederhana mungkin:
 
 * Tidak ada field input manual.
-* Pengunjung cukup klik **Konfirmasi Transfer** satu kali.
+* Pengunjung cukup klik satu tombol konfirmasi sesuai template.
 * Setelah tombol diklik, aplikasi meminta izin lokasi dan kamera dari browser lalu mengirim hasilnya otomatis jika izin diberikan.
 
 Setelah aksi konfirmasi sukses: tampilkan halaman terima kasih/ringkasan, ubah status kasus menjadi `terverifikasi`, dan catat timestamp di riwayat aktivitas.
 
-### 5.6 Pengambilan foto selfie
+### 5.6 Verification template engine
+
+Satu kasus wajib memilih tepat satu template verifikasi.
+
+Template yang tersedia pada MVP:
+
+* Konfirmasi transfer.
+* Konfirmasi penerimaan barang.
+* Verifikasi janji temu.
+* Verifikasi dokumen.
+* Verifikasi identitas.
+* Konfirmasi pengambilan.
+
+Prinsip arsitektur:
+
+* Template engine: hanya mengatur konten/teks/tombol/tema halaman publik.
+* Verification engine: menangani validasi token, satu kali konfirmasi, status kasus, dan response API.
+* Evidence engine: menangani metadata perangkat, lokasi, foto, dan penyimpanan bukti.
+
+Konsekuensi desain:
+
+* Yang berubah antar template hanya tampilan publik (UI layer).
+* Proses backend tetap satu jalur dan menyimpan hasil ke tabel `verifications` yang sama.
+
+### 5.7 Pengambilan foto selfie
 
 Setelah tombol konfirmasi ditekan, browser meminta izin kamera.
 
 Apabila pengguna menyetujui:
 
 1. Kamera depan dibuka (WebRTC).
-2. Foto diambil.
+2. Sistem mengambil **maksimal 3 foto** secara berurutan (dengan jeda singkat antar pengambilan).
 3. Foto dikompresi di sisi klien sebelum dikirim.
 4. Foto dikirim ke server bersama payload verifikasi otomatis.
 5. Foto disimpan di storage **private** (tidak dapat diakses via URL publik langsung — hanya lewat dashboard admin dengan signed URL sementara).
@@ -205,17 +232,18 @@ Validasi upload:
 
 * Format: JPEG/PNG/WebP.
 * Ukuran maksimum: 5 MB (sebelum kompresi klien).
-* Jika validasi gagal di server, verifikasi tetap tersimpan tapi `photo_status = gagal`, tidak membatalkan submit form.
+* Maksimal 3 file per verifikasi; file ke-4 dan seterusnya diabaikan.
+* Jika salah satu foto gagal validasi di server, foto yang valid tetap disimpan; jika tidak ada satupun yang valid, verifikasi tetap tersimpan tapi `photo_status = gagal`, tidak membatalkan submit form.
 
 Data yang disimpan:
 
-* Path foto.
+* Path foto (array, hingga 3 entri).
 * Waktu pengambilan.
 * Status foto (`diberikan` / `ditolak` / `gagal`).
 
 Jika izin ditolak oleh pengguna: `photo_status = ditolak`, proses verifikasi tetap lanjut.
 
-### 5.7 Pelacakan lokasi
+### 5.8 Pelacakan lokasi
 
 Browser meminta izin lokasi via Geolocation API.
 
@@ -228,7 +256,7 @@ Status lokasi (`location_status`): `diberikan` / `ditolak` / `gagal` (mis. timeo
 
 Jika izin ditolak: proses verifikasi tetap lanjut, status tersimpan sebagai `ditolak`.
 
-### 5.8 Metadata perangkat
+### 5.9 Metadata perangkat
 
 Dicatat otomatis dari request, tanpa perlu izin eksplisit:
 
@@ -237,7 +265,7 @@ Dicatat otomatis dari request, tanpa perlu izin eksplisit:
 * Bahasa (`Accept-Language`).
 * Timezone dan resolusi layar (dikirim dari klien via JS saat halaman dimuat).
 
-### 5.9 Riwayat aktivitas
+### 5.10 Riwayat aktivitas
 
 Setiap aktivitas dicatat dengan timestamp. Contoh timeline:
 
@@ -251,13 +279,13 @@ Setiap aktivitas dicatat dengan timestamp. Contoh timeline:
 
 Fitur: filter tanggal, pencarian, lihat detail.
 
-### 5.10 Peta lokasi
+### 5.11 Peta lokasi
 
 Menggunakan Leaflet.js.
 
 Fitur: marker lokasi, popup informasi (alamat perkiraan via reverse geocoding), link buka di Google Maps, zoom/pan.
 
-### 5.11 Laporan (Export PDF)
+### 5.12 Laporan (Export PDF)
 
 Isi laporan:
 
@@ -273,16 +301,17 @@ Isi laporan:
 
 1. Login.
 2. Membuat kasus (isi data transaksi) → sistem generate `reference_number` + `token` + `expires_at`.
-3. Mengirim link verifikasi ke penerima (di luar sistem — copy-paste manual, sesuai §3 "di luar ruang lingkup" untuk WhatsApp/email otomatis).
-4. Memantau status kasus dari dashboard.
-5. Melihat hasil verifikasi (foto, lokasi, metadata) di halaman detail kasus.
-6. Mengunduh laporan PDF.
+3. Memilih template verifikasi yang sesuai kebutuhan kasus.
+4. Mengirim link verifikasi ke penerima (di luar sistem — copy-paste manual, sesuai §3 "di luar ruang lingkup" untuk WhatsApp/email otomatis).
+5. Memantau status kasus dari dashboard.
+6. Melihat hasil verifikasi (foto, lokasi, metadata) di halaman detail kasus.
+7. Mengunduh laporan PDF.
 
 ### Alur Pengunjung
 
 1. Membuka link verifikasi.
 2. Sistem validasi token (lihat tabel kondisi di §5.5).
-3. Jika valid: melihat informasi transaksi, klik tombol **Konfirmasi Transfer**.
+3. Jika valid: melihat informasi sesuai template, klik tombol konfirmasi sesuai template.
 4. Browser meminta izin lokasi.
 5. Browser meminta izin kamera/foto.
 6. Sistem simpan data verifikasi (termasuk status izin), ubah status kasus jadi `terverifikasi`.
@@ -296,11 +325,15 @@ Isi laporan:
 
 ### cases
 
-* id, reference_number, target_name, bank_name, account_number, amount, notes, status, token, expires_at, created_at, updated_at
+* id, template_id, reference_number, target_name, bank_name, account_number, amount, notes, status, token, expires_at, created_at, updated_at
+
+### verification_templates
+
+* id, name, slug, title, button_text, theme, is_active, created_at, updated_at
 
 ### verifications
 
-* id, case_id, photo_path, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
+* id, case_id, photo_paths, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
 
 > Skema ini konsisten dengan `AGENTS.md` §6. `bigint` auto-increment sebagai PK, snake_case, tanpa UUID/soft delete kecuali diminta.
 
@@ -314,9 +347,11 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 
 Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otomatis dari hasil izin perangkat/browser.
 
+Endpoint backend ini dipakai untuk semua template; tidak ada endpoint terpisah per template.
+
 ```json
 {
-  "photo": "file, nullable, image, max:5120 (KB), mimes:jpeg,png,webp",
+  "photo": "file[], nullable, maksimal 3 file, image, max:5120 (KB) per file, mimes:jpeg,png,webp",
   "latitude": "numeric, nullable, between:-90,90",
   "longitude": "numeric, nullable, between:-180,180",
   "accuracy": "numeric, nullable"
@@ -367,8 +402,9 @@ Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otoma
 
 **Ketersediaan:** Tidak ada SLA formal untuk MVP, tapi downtime saat token pengunjung aktif harus diminimalkan (idealnya tidak deploy saat ada link yang sedang berlaku, atau pastikan zero-downtime deploy).
 
-**Aksesibilitas dasar:** Form verifikasi harus bisa diisi dengan keyboard saja (tanpa mouse), label form jelas untuk screen reader dasar.
-**Aksesibilitas dasar:** Tombol **Konfirmasi Transfer** harus bisa diakses via keyboard, dan prompt izin perangkat harus memiliki instruksi yang jelas.
+**Aksesibilitas dasar:** Tombol konfirmasi harus bisa diakses via keyboard, dan prompt izin perangkat harus memiliki instruksi yang jelas.
+
+Catatan: label tombol mengikuti template (mis. "Konfirmasi Penerimaan", "Konfirmasi Identitas"), namun standar aksesibilitas tetap sama.
 
 **Privasi & retensi data:** Foto dan lokasi hanya dikumpulkan dengan izin eksplisit (lihat §14). Tidak ada kebijakan retensi/penghapusan otomatis di MVP — data disimpan permanen kecuali dihapus manual oleh admin.
 
@@ -378,11 +414,11 @@ Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otoma
 
 **Dashboard:** Statistik, aktivitas terbaru, tombol "Buat Kasus".
 
-**Kasus (list):** Tabel kasus (dengan filter status), tombol "Generate Link" per baris, tombol detail.
+**Kasus (list):** Tabel kasus (dengan filter status dan template), tombol "Generate Link" per baris, tombol detail.
 
 **Detail Kasus:** Informasi transaksi, link verifikasi (dengan tombol copy, regenerate, nonaktifkan), riwayat verifikasi, foto, peta lokasi, tombol "Unduh PDF".
 
-**Halaman Verifikasi (publik):** Informasi transaksi, tombol "Konfirmasi Transfer", prompt izin lokasi, dan prompt izin kamera.
+**Halaman Verifikasi (publik):** Informasi sesuai template, tombol konfirmasi sesuai template, prompt izin lokasi, dan prompt izin kamera.
 
 **Halaman Error/Expired (publik):** Pesan sesuai tabel §5.5, tanpa membocorkan detail kasus.
 
@@ -390,9 +426,9 @@ Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otoma
 
 ## 12. Roadmap MVP
 
-**Fase 1** — Login, Dashboard, CRUD kasus, Generate link.
+**Fase 1** — Login, Dashboard, CRUD kasus, master template verifikasi, Generate link.
 
-**Fase 2** — Verifikasi satu klik, metadata perangkat, riwayat aktivitas, halaman error/expired.
+**Fase 2** — Verifikasi satu klik lintas template, metadata perangkat, riwayat aktivitas, halaman error/expired.
 
 **Fase 3** — Foto, lokasi, peta, PDF.
 
@@ -401,9 +437,9 @@ Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otoma
 ## 13. Indikator keberhasilan
 
 * Admin dapat login.
-* Kasus dapat dibuat dengan reference number yang benar formatnya.
-* Link verifikasi dapat diakses selama token valid, dan menampilkan halaman yang sesuai (konfirmasi satu klik / error / read-only) sesuai kondisi token.
-* Verifikasi berhasil tersimpan setelah klik **Konfirmasi Transfer** dan status kasus berubah menjadi `terverifikasi`.
+* Kasus dapat dibuat dengan reference number yang benar formatnya dan template verifikasi yang aktif.
+* Link verifikasi dapat diakses selama token valid, dan menampilkan halaman yang sesuai (konfirmasi satu klik per template / error / read-only) sesuai kondisi token.
+* Verifikasi berhasil tersimpan setelah klik tombol konfirmasi sesuai template dan status kasus berubah menjadi `terverifikasi`.
 * Metadata perangkat tercatat otomatis di setiap kunjungan.
 * Lokasi tercatat jika izin diberikan, status tersimpan dengan benar jika ditolak.
 * Foto tercatat jika izin diberikan dan lolos validasi, status tersimpan dengan benar jika ditolak/gagal.
@@ -425,3 +461,11 @@ Foto dan lokasi hanya dikumpulkan apabila pengguna memberikan izin secara ekspli
 - Tambahan: halaman error/expired dan halaman terima kasih di §3 dan §11 — alur sebelumnya berhenti di "Selesai" tanpa menjelaskan apa yang dilihat pengunjung.
 - Tambahan: detail keamanan (rate limit spesifik, signed URL untuk foto) dan kebutuhan non-fungsional (aksesibilitas, retensi data, ketersediaan) yang sebelumnya terlalu tipis.
 - Ditambahkan referensi silang ke `AGENTS.md` supaya roadmap dan skema database tidak perlu dijaga sinkron secara manual di dua tempat.
+
+**v1.2**
+- Perubahan: pengambilan foto selfie diubah dari 1 foto menjadi maksimal 3 foto per verifikasi (§5.7). Skema `verifications.photo_path` (single string) diganti `photo_paths` (JSON array, hingga 3 entri) di §7; payload API `photo` menjadi `file[]` maksimal 3 di §8; foto tampil berurutan di detail kasus (§11).
+
+**v1.3**
+- Tambahan: konsep verification template engine, di mana satu kasus memilih satu template dan halaman publik mengikuti template tersebut (§5.5, §5.6).
+- Tambahan: master data `verification_templates` dan relasi `cases.template_id` untuk mendukung skenario verifikasi lintas kebutuhan tanpa mengubah backend inti (§7).
+- Penegasan: backend verifikasi, pencatatan metadata, lokasi, dan foto tetap satu jalur untuk semua template; yang berubah hanya UI/teks/tombol halaman publik (§5.6, §8).

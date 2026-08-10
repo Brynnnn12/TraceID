@@ -1,7 +1,7 @@
 <x-guest-layout>
     <div class="text-center">
         <h2 class="text-lg font-semibold text-green-600">Verifikasi Berhasil</h2>
-        <p class="mt-2 text-sm text-gray-600">Terima kasih, verifikasi transaksi Anda telah berhasil disimpan.</p>
+        <p class="mt-2 text-sm text-gray-600">Terima kasih, verifikasi Anda telah berhasil disimpan.</p>
     </div>
 
     <dl class="mt-6 grid grid-cols-1 gap-4">

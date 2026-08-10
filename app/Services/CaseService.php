@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\ActivityType;
 use App\Enums\CaseStatus;
 use App\Models\CaseFile;
+use App\Models\VerificationTemplate;
 use Illuminate\Support\Str;
 
 class CaseService
@@ -40,7 +41,9 @@ class CaseService
     public function create(array $data): CaseFile
     {
         $case = CaseFile::create([
-            ...$data,
+            'template_id' => $data['template_id'],
+            'fields' => $this->filteredFields($data),
+            'notes' => $data['notes'] ?? null,
             'reference_number' => $this->generateReferenceNumber(),
             'token' => $this->generateToken(),
             'status' => CaseStatus::Aktif,
@@ -57,7 +60,11 @@ class CaseService
      */
     public function update(CaseFile $case, array $data): CaseFile
     {
-        $case->update($data);
+        $case->update([
+            'template_id' => $data['template_id'],
+            'fields' => $this->filteredFields($data),
+            'notes' => $data['notes'] ?? null,
+        ]);
 
         return $case;
     }
@@ -65,5 +72,36 @@ class CaseService
     public function delete(CaseFile $case): void
     {
         $case->delete();
+    }
+
+    /**
+     * Keep only the fields defined by the case template and drop empty values.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, string>
+     */
+    private function filteredFields(array $data): array
+    {
+        $template = VerificationTemplate::find($data['template_id']);
+
+        if ($template === null) {
+            return [];
+        }
+
+        $fields = [];
+
+        foreach ($template->fields() as $field) {
+            $value = $data['fields'][$field['key']] ?? null;
+
+            if (is_string($value)) {
+                $value = trim($value);
+            }
+
+            if ($value !== null && $value !== '') {
+                $fields[$field['key']] = (string) $value;
+            }
+        }
+
+        return $fields;
     }
 }

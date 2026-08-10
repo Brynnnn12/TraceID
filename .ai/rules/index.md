@@ -6,3 +6,4 @@ Before planning or editing, find the row whose globs match the file's path and r
 | --- | --- |
 | resources/views/cases/**.blade.php | .ai/rules/cases.md |
 | app/Http/Requests/*.php | .ai/rules/requests.md |
+| resources/views/** | .ai/rules/views.md |

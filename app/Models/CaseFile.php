@@ -6,6 +6,7 @@ use App\Enums\CaseStatus;
 use Database\Factories\CaseFileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CaseFile extends Model
@@ -23,10 +24,8 @@ class CaseFile extends Model
      */
     protected $fillable = [
         'reference_number',
-        'target_name',
-        'bank_name',
-        'account_number',
-        'amount',
+        'template_id',
+        'fields',
         'notes',
         'status',
         'token',
@@ -39,10 +38,15 @@ class CaseFile extends Model
     protected function casts(): array
     {
         return [
-            'amount' => 'decimal:2',
+            'fields' => 'array',
             'status' => CaseStatus::class,
             'expires_at' => 'datetime',
         ];
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(VerificationTemplate::class, 'template_id');
     }
 
     public function verifications(): HasMany
@@ -53,6 +57,45 @@ class CaseFile extends Model
     public function activities(): HasMany
     {
         return $this->hasMany(ActivityLog::class, 'case_id');
+    }
+
+    public function fieldValue(string $key): ?string
+    {
+        $value = $this->fields[$key] ?? null;
+
+        return $value === '' ? null : $value;
+    }
+
+    public function formattedField(string $key): ?string
+    {
+        $value = $this->fieldValue($key);
+
+        if ($value === null) {
+            return null;
+        }
+
+        $field = collect($this->template?->fields() ?? [])->firstWhere('key', $key);
+
+        if (($field['format'] ?? null) === 'currency') {
+            return 'Rp '.number_format((float) $value, 0, ',', '.');
+        }
+
+        return $value;
+    }
+
+    public function summary(): string
+    {
+        $parts = [];
+
+        foreach ($this->template?->fields() ?? [] as $field) {
+            $value = $this->formattedField($field['key']);
+
+            if ($value !== null) {
+                $parts[] = $field['label'].': '.$value;
+            }
+        }
+
+        return implode(' · ', $parts);
     }
 
     public function isExpired(): bool

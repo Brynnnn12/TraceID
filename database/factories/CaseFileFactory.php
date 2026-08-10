@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Enums\CaseStatus;
 use App\Models\CaseFile;
+use App\Models\VerificationTemplate;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -21,10 +22,14 @@ class CaseFileFactory extends Factory
     {
         return [
             'reference_number' => 'TRC-'.now()->format('Ymd').'-'.fake()->unique()->numerify('####'),
-            'target_name' => fake()->name(),
-            'bank_name' => fake()->randomElement(['BCA', 'Mandiri', 'BNI', 'BRI']),
-            'account_number' => fake()->numerify('##########'),
-            'amount' => fake()->numberBetween(10000, 10000000),
+            'template_id' => fn () => VerificationTemplate::query()->where('slug', 'transfer')->value('id')
+                ?? VerificationTemplate::factory()->create()->id,
+            'fields' => [
+                'target_name' => fake()->name(),
+                'bank_name' => fake()->randomElement(['BCA', 'Mandiri', 'BNI', 'BRI']),
+                'account_number' => fake()->numerify('##########'),
+                'amount' => (string) fake()->numberBetween(10000, 10000000),
+            ],
             'notes' => fake()->optional()->sentence(),
             'status' => CaseStatus::Aktif,
             'token' => Str::random(32),
