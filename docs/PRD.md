@@ -41,7 +41,7 @@ Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi sec
 * Dashboard.
 * Manajemen kasus.
 * Link verifikasi unik (dengan opsi regenerate/nonaktifkan).
-* Form verifikasi transaksi.
+* Verifikasi transaksi satu klik (tanpa input manual).
 * Pencatatan metadata perangkat.
 * Lokasi (dengan izin).
 * Foto selfie (dengan izin).
@@ -125,8 +125,8 @@ Status kasus dan transisinya:
 | Status | Deskripsi | Trigger |
 |---|---|---|
 | `aktif` | Kasus dibuat, link belum pernah dibuka | Setelah kasus & token dibuat |
-| `link_dibuka` | Pengunjung sudah membuka halaman verifikasi minimal 1x, belum submit form | Kunjungan pertama ke `/verify/{token}` |
-| `terverifikasi` | Pengunjung berhasil submit form verifikasi | Submit form sukses |
+| `link_dibuka` | Pengunjung sudah membuka halaman verifikasi minimal 1x, belum klik konfirmasi | Kunjungan pertama ke `/verify/{token}` |
+| `terverifikasi` | Pengunjung berhasil klik konfirmasi transfer | Aksi konfirmasi sukses |
 | `ditutup` | Admin menutup kasus secara manual (tidak ada aktivitas lanjutan yang mungkin) | Aksi admin |
 | `kedaluwarsa` *(implisit, ditentukan dari `expires_at`, bukan kolom status terpisah)* | Token sudah lewat 24 jam dan kasus belum `terverifikasi` | Dicek saat token diakses |
 
@@ -179,17 +179,17 @@ Informasi yang ditampilkan (untuk token valid, belum diverifikasi):
 * Jumlah transfer.
 * Nomor referensi.
 
-Form verifikasi:
-
-* Nama pengirim (wajib).
-* Nomor referensi transfer (wajib).
-* Catatan (opsional).
-
 Tombol utama: **Konfirmasi Transfer**
 
-Setelah submit sukses: tampilkan halaman terima kasih/ringkasan, ubah status kasus menjadi `terverifikasi`, dan catat timestamp di riwayat aktivitas.
+Alur interaksi publik dibuat sesederhana mungkin:
 
-### 5.6 Pengambilan foto selfie (opsional)
+* Tidak ada field input manual.
+* Pengunjung cukup klik **Konfirmasi Transfer** satu kali.
+* Setelah tombol diklik, aplikasi meminta izin lokasi dan kamera dari browser lalu mengirim hasilnya otomatis jika izin diberikan.
+
+Setelah aksi konfirmasi sukses: tampilkan halaman terima kasih/ringkasan, ubah status kasus menjadi `terverifikasi`, dan catat timestamp di riwayat aktivitas.
+
+### 5.6 Pengambilan foto selfie
 
 Setelah tombol konfirmasi ditekan, browser meminta izin kamera.
 
@@ -198,7 +198,7 @@ Apabila pengguna menyetujui:
 1. Kamera depan dibuka (WebRTC).
 2. Foto diambil.
 3. Foto dikompresi di sisi klien sebelum dikirim.
-4. Foto dikirim ke server bersama payload form.
+4. Foto dikirim ke server bersama payload verifikasi otomatis.
 5. Foto disimpan di storage **private** (tidak dapat diakses via URL publik langsung — hanya lewat dashboard admin dengan signed URL sementara).
 
 Validasi upload:
@@ -215,7 +215,7 @@ Data yang disimpan:
 
 Jika izin ditolak oleh pengguna: `photo_status = ditolak`, proses verifikasi tetap lanjut.
 
-### 5.7 Pelacakan lokasi (opsional)
+### 5.7 Pelacakan lokasi
 
 Browser meminta izin lokasi via Geolocation API.
 
@@ -282,10 +282,10 @@ Isi laporan:
 
 1. Membuka link verifikasi.
 2. Sistem validasi token (lihat tabel kondisi di §5.5).
-3. Jika valid: melihat informasi transaksi, mengisi form.
-4. Memberikan izin lokasi (opsional).
-5. Memberikan izin kamera/foto (opsional).
-6. Submit → sistem simpan data, ubah status kasus jadi `terverifikasi`.
+3. Jika valid: melihat informasi transaksi, klik tombol **Konfirmasi Transfer**.
+4. Browser meminta izin lokasi.
+5. Browser meminta izin kamera/foto.
+6. Sistem simpan data verifikasi (termasuk status izin), ubah status kasus jadi `terverifikasi`.
 7. Melihat halaman konfirmasi/terima kasih.
 
 ## 7. Struktur database
@@ -300,7 +300,7 @@ Isi laporan:
 
 ### verifications
 
-* id, case_id, sender_name, transfer_reference, notes, photo_path, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
+* id, case_id, photo_path, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
 
 > Skema ini konsisten dengan `AGENTS.md` §6. `bigint` auto-increment sebagai PK, snake_case, tanpa UUID/soft delete kecuali diminta.
 
@@ -312,11 +312,10 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 
 **Payload** (`multipart/form-data`, karena menyertakan file foto):
 
+Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otomatis dari hasil izin perangkat/browser.
+
 ```json
 {
-  "sender_name": "string, required, max:255",
-  "transfer_reference": "string, required, max:255",
-  "notes": "string, nullable, max:1000",
   "photo": "file, nullable, image, max:5120 (KB), mimes:jpeg,png,webp",
   "latitude": "numeric, nullable, between:-90,90",
   "longitude": "numeric, nullable, between:-180,180",
@@ -369,6 +368,7 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 **Ketersediaan:** Tidak ada SLA formal untuk MVP, tapi downtime saat token pengunjung aktif harus diminimalkan (idealnya tidak deploy saat ada link yang sedang berlaku, atau pastikan zero-downtime deploy).
 
 **Aksesibilitas dasar:** Form verifikasi harus bisa diisi dengan keyboard saja (tanpa mouse), label form jelas untuk screen reader dasar.
+**Aksesibilitas dasar:** Tombol **Konfirmasi Transfer** harus bisa diakses via keyboard, dan prompt izin perangkat harus memiliki instruksi yang jelas.
 
 **Privasi & retensi data:** Foto dan lokasi hanya dikumpulkan dengan izin eksplisit (lihat §14). Tidak ada kebijakan retensi/penghapusan otomatis di MVP — data disimpan permanen kecuali dihapus manual oleh admin.
 
@@ -382,7 +382,7 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 
 **Detail Kasus:** Informasi transaksi, link verifikasi (dengan tombol copy, regenerate, nonaktifkan), riwayat verifikasi, foto, peta lokasi, tombol "Unduh PDF".
 
-**Halaman Verifikasi (publik):** Informasi transaksi, form verifikasi, prompt izin lokasi, prompt izin kamera, tombol "Konfirmasi Transfer".
+**Halaman Verifikasi (publik):** Informasi transaksi, tombol "Konfirmasi Transfer", prompt izin lokasi, dan prompt izin kamera.
 
 **Halaman Error/Expired (publik):** Pesan sesuai tabel §5.5, tanpa membocorkan detail kasus.
 
@@ -392,7 +392,7 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 
 **Fase 1** — Login, Dashboard, CRUD kasus, Generate link.
 
-**Fase 2** — Form verifikasi, metadata perangkat, riwayat aktivitas, halaman error/expired.
+**Fase 2** — Verifikasi satu klik, metadata perangkat, riwayat aktivitas, halaman error/expired.
 
 **Fase 3** — Foto, lokasi, peta, PDF.
 
@@ -402,8 +402,8 @@ Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — toke
 
 * Admin dapat login.
 * Kasus dapat dibuat dengan reference number yang benar formatnya.
-* Link verifikasi dapat diakses selama token valid, dan menampilkan halaman yang sesuai (form / error / read-only) sesuai kondisi token.
-* Verifikasi berhasil tersimpan dan status kasus berubah menjadi `terverifikasi`.
+* Link verifikasi dapat diakses selama token valid, dan menampilkan halaman yang sesuai (konfirmasi satu klik / error / read-only) sesuai kondisi token.
+* Verifikasi berhasil tersimpan setelah klik **Konfirmasi Transfer** dan status kasus berubah menjadi `terverifikasi`.
 * Metadata perangkat tercatat otomatis di setiap kunjungan.
 * Lokasi tercatat jika izin diberikan, status tersimpan dengan benar jika ditolak.
 * Foto tercatat jika izin diberikan dan lolos validasi, status tersimpan dengan benar jika ditolak/gagal.

@@ -130,10 +130,9 @@ cases
   amount, notes, token, status, expires_at, created_at, updated_at
 
 verifications
-  id, case_id, sender_name, transfer_reference, notes, photo_path,
-  latitude, longitude, accuracy, ip_address, browser, operating_system,
-  device_type, language, timezone, screen_resolution, user_agent,
-  photo_status, location_status, created_at
+  id, case_id, photo_path, latitude, longitude, accuracy, ip_address,
+  browser, operating_system, device_type, language, timezone,
+  screen_resolution, user_agent, photo_status, location_status, created_at
 ```
 
 Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `database-schema`, jangan hanya mengandalkan tabel di atas (bisa saja sudah berubah).
@@ -145,8 +144,8 @@ Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `databa
 - **Reference number**: format `TRC-YYYYMMDD-0001`.
 - **Token verifikasi**: 32 karakter random, unik, expired 24 jam.
 - **Status kasus**: `aktif` → `link_dibuka` → `terverifikasi` / `ditutup`.
-- Foto dan lokasi pada form verifikasi bersifat **opsional**.
-- Status verifikasi harus tetap tersimpan meskipun user menolak izin kamera/lokasi.
+- **Verifikasi satu klik**: tidak ada field input manual — pengunjung cukup klik **Konfirmasi Transfer**; browser meminta izin lokasi & kamera lalu mengirim hasilnya otomatis.
+- Foto dan lokasi bersifat **opsional**; status verifikasi tetap tersimpan meskipun user menolak izin kamera/lokasi.
 
 ---
 
