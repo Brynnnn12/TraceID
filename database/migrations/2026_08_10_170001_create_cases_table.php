@@ -14,10 +14,8 @@ return new class extends Migration
         Schema::create('cases', function (Blueprint $table) {
             $table->id();
             $table->string('reference_number')->unique();
-            $table->string('target_name');
-            $table->string('bank_name');
-            $table->string('account_number');
-            $table->decimal('amount', 15, 2);
+            $table->foreignId('template_id')->constrained('verification_templates');
+            $table->json('fields')->nullable();
             $table->text('notes')->nullable();
             $table->string('status')->default('aktif')->index();
             $table->string('token', 32)->unique();

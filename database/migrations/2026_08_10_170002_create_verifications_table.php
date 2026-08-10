@@ -14,10 +14,7 @@ return new class extends Migration
         Schema::create('verifications', function (Blueprint $table) {
             $table->id();
             $table->foreignId('case_id')->constrained()->cascadeOnDelete();
-            $table->string('sender_name');
-            $table->string('transfer_reference');
-            $table->text('notes')->nullable();
-            $table->string('photo_path')->nullable();
+            $table->json('photo_paths')->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->decimal('accuracy', 9, 2)->nullable();
