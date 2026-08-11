@@ -168,6 +168,73 @@ test('admin can delete a case', function () {
     expect(CaseFile::find($case->id))->toBeNull();
 });
 
+test('admin can regenerate a verification link', function () {
+    $case = CaseFile::factory()->create(['status' => CaseStatus::LinkDibuka]);
+
+    $oldToken = $case->token;
+
+    $response = $this->actingAs($this->user)
+        ->post(route('cases.regenerate-link', $case));
+
+    $response->assertRedirect(route('cases.show', $case));
+
+    $fresh = $case->fresh();
+
+    expect($fresh->token)->not->toBe($oldToken)
+        ->and(strlen($fresh->token))->toBe(32)
+        ->and($fresh->status)->toBe(CaseStatus::Aktif)
+        ->and($fresh->expires_at->isFuture())->toBeTrue();
+});
+
+test('a verified case cannot regenerate its link', function () {
+    $case = CaseFile::factory()->create(['status' => CaseStatus::Terverifikasi]);
+
+    $this->actingAs($this->user)
+        ->post(route('cases.regenerate-link', $case))
+        ->assertForbidden();
+});
+
+test('admin can close a case link', function () {
+    $case = CaseFile::factory()->create(['status' => CaseStatus::LinkDibuka]);
+
+    $response = $this->actingAs($this->user)->post(route('cases.close', $case));
+
+    $response->assertRedirect(route('cases.show', $case));
+
+    expect($case->fresh()->status)->toBe(CaseStatus::Ditutup);
+});
+
+test('cases can be filtered by status', function () {
+    CaseFile::factory()->create(['status' => CaseStatus::Aktif]);
+    CaseFile::factory()->create(['status' => CaseStatus::Terverifikasi]);
+
+    $this->actingAs($this->user)
+        ->get(route('cases.index', ['status' => CaseStatus::Terverifikasi->value]))
+        ->assertOk()
+        ->assertViewHas('cases', function ($cases) {
+            return $cases->total() === 1
+                && $cases->first()->status === CaseStatus::Terverifikasi;
+        });
+});
+
+test('cases can be filtered by template', function () {
+    $otherTemplate = VerificationTemplate::factory()->create([
+        'name' => 'Konfirmasi Penerimaan Barang',
+        'slug' => 'goods-receipt',
+    ]);
+
+    CaseFile::factory()->create(['template_id' => $this->transferTemplate->id]);
+    CaseFile::factory()->create(['template_id' => $otherTemplate->id]);
+
+    $this->actingAs($this->user)
+        ->get(route('cases.index', ['template' => $otherTemplate->id]))
+        ->assertOk()
+        ->assertViewHas('cases', function ($cases) use ($otherTemplate) {
+            return $cases->total() === 1
+                && $cases->first()->template_id === $otherTemplate->id;
+        });
+});
+
 test('case can report expired status based on expires_at', function () {
     $expired = CaseFile::factory()->create(['expires_at' => now()->subHour()]);
     $active = CaseFile::factory()->create(['expires_at' => now()->addHours(2)]);

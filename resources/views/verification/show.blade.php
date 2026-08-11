@@ -75,8 +75,73 @@
             function capturePhoto() {
                 return new Promise(function (resolve) {
                     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                        document.getElementById('photo_status').value = 'gagal';
                         resolve();
                         return;
+                    }
+
+                    var files = [];
+                    var MAX_PHOTOS = 3;
+
+                    function stopStream(stream) {
+                        stream.getTracks().forEach(function (track) { track.stop(); });
+                    }
+
+                    function finish(stream) {
+                        stopStream(stream);
+
+                        if (files.length > 0) {
+                            var transfer = new DataTransfer();
+                            files.forEach(function (file) { transfer.items.add(file); });
+                            photoInput.files = transfer.files;
+                            document.getElementById('photo_status').value = 'diberikan';
+                        }
+
+                        captureStatus.textContent = files.length + ' dari ' + MAX_PHOTOS + ' foto diambil.';
+                        resolve();
+                    }
+
+                    function waitForFrame(video, callback, elapsed) {
+                        if (elapsed > 2000) {
+                            callback();
+                            return;
+                        }
+
+                        if (video.videoWidth > 0 && video.currentTime > 0) {
+                            callback();
+                            return;
+                        }
+
+                        if ('requestVideoFrameCallback' in video) {
+                            video.requestVideoFrameCallback(function () {
+                                if (video.videoWidth > 0) {
+                                    callback();
+                                } else {
+                                    setTimeout(function () { waitForFrame(video, callback, elapsed + 50); }, 50);
+                                }
+                            });
+                        } else {
+                            setTimeout(function () { waitForFrame(video, callback, elapsed + 50); }, 50);
+                        }
+                    }
+
+                    function snap(video, stream, remaining) {
+                        var canvas = document.createElement('canvas');
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                        canvas.toBlob(function (blob) {
+                            if (blob) {
+                                files.push(new File([blob], 'foto-' + (files.length + 1) + '.jpg', { type: 'image/jpeg' }));
+                            }
+
+                            if (remaining > 1) {
+                                setTimeout(function () { snap(video, stream, remaining - 1); }, 600);
+                            } else {
+                                finish(stream);
+                            }
+                        }, 'image/jpeg', 0.7);
                     }
 
                     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } })
@@ -85,45 +150,14 @@
                             video.srcObject = stream;
                             video.playsInline = true;
                             video.setAttribute('muted', '');
-                            video.play();
+                            video.setAttribute('autoplay', '');
 
-                            video.addEventListener('loadedmetadata', function () {
-                                var files = [];
-                                var remaining = 3;
+                            video.play().catch(function () {});
 
-                                function snap() {
-                                    var canvas = document.createElement('canvas');
-                                    canvas.width = video.videoWidth;
-                                    canvas.height = video.videoHeight;
-                                    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-
-                                    canvas.toBlob(function (blob) {
-                                        if (blob) {
-                                            files.push(new File([blob], 'foto-' + (files.length + 1) + '.jpg', { type: 'image/jpeg' }));
-                                        }
-                                        remaining--;
-                                        if (remaining > 0) {
-                                            setTimeout(snap, 600);
-                                        } else {
-                                            finish();
-                                        }
-                                    }, 'image/jpeg', 0.7);
-                                }
-
-                                function finish() {
-                                    stream.getTracks().forEach(function (track) { track.stop(); });
-
-                                    if (files.length > 0) {
-                                        var transfer = new DataTransfer();
-                                        files.forEach(function (file) { transfer.items.add(file); });
-                                        photoInput.files = transfer.files;
-                                        document.getElementById('photo_status').value = 'diberikan';
-                                    }
-
-                                    resolve();
-                                }
-
-                                snap();
+                            video.addEventListener('loadeddata', function () {
+                                waitForFrame(video, function () {
+                                    snap(video, stream, MAX_PHOTOS);
+                                }, 0);
                             });
                         })
                         .catch(function (error) {

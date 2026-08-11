@@ -14,6 +14,7 @@
                         @method('PUT')
                         @include('cases._form', [
                             'case' => $case,
+                            'templates' => $templates,
                             'form' => [
                                 'templateId' => (string) old('template_id', $case->template_id ?? ''),
                                 'fields' => old('fields', $case->fields ?? []),

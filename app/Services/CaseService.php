@@ -74,6 +74,40 @@ class CaseService
         $case->delete();
     }
 
+    public function regenerateLink(CaseFile $case): CaseFile
+    {
+        abort_if(
+            in_array($case->status, [CaseStatus::Terverifikasi, CaseStatus::Ditutup], true),
+            403,
+            'Link tidak dapat diregenerasi untuk kasus ini.',
+        );
+
+        $case->update([
+            'token' => $this->generateToken(),
+            'status' => CaseStatus::Aktif,
+            'expires_at' => now()->addHours(24),
+        ]);
+
+        $this->activityService->record($case, ActivityType::LinkDiregenerasi);
+
+        return $case;
+    }
+
+    public function close(CaseFile $case): CaseFile
+    {
+        abort_if(
+            $case->status === CaseStatus::Ditutup,
+            403,
+            'Kasus ini sudah ditutup.',
+        );
+
+        $case->update(['status' => CaseStatus::Ditutup]);
+
+        $this->activityService->record($case, ActivityType::LinkDitutup);
+
+        return $case;
+    }
+
     /**
      * Keep only the fields defined by the case template and drop empty values.
      *

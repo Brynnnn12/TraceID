@@ -1,28 +1,28 @@
 # Product Requirements Document (PRD)
 
-# TraceID – Sistem Dokumentasi dan Verifikasi Bukti Digital Transaksi
+# TraceID – Sistem Dokumentasi dan Verifikasi Bukti Digital (Transfer Bank & Social Media)
 
-Versi: 1.3 (MVP)
+Versi: 3.0 (MVP)
 Platform: Web Application
 Framework: Laravel 13 + Breeze + MySQL + Tailwind CSS + Alpine.js
 
-> **Perubahan dari v1.0**: memperbaiki inkonsistensi token vs reference number pada link verifikasi, melengkapi alur status kasus, menambahkan aturan validasi upload, halaman error/expired, dan struktur non-fungsional yang lebih rinci. Lihat §15 untuk changelog lengkap.
+> **Perubahan dari v2.0**: arsitektur tidak lagi berbasis banyak record per transaksi. Sistem kini memiliki **dua konfigurasi tunggal (singleton)** — Bank Transfer dan Social Media — yang dibuat otomatis dengan data kosong dan mudah dikonfigurasi. Satu link publik `/verify` dipakai bersama banyak pengunjung; setiap pengunjung yang menekan tombol (**Konfirmasi** untuk transfer bank, **Follow** untuk social media) menghasilkan satu verifikasi terpisah (foto + lokasi + metadata). Lihat §15 untuk changelog lengkap.
 
 ---
 
 ## 1. Ringkasan produk
 
-TraceID adalah aplikasi berbasis web yang digunakan untuk membuat halaman verifikasi transaksi dan mendokumentasikan bukti digital dari proses konfirmasi transaksi. Sistem memungkinkan admin membuat kasus, menghasilkan link verifikasi unik, serta mencatat informasi seperti waktu akses, alamat IP, metadata perangkat, lokasi, dan foto apabila pengguna memberikan izin melalui browser.
+TraceID adalah aplikasi berbasis web untuk membuat halaman verifikasi bukti digital dan mendokumentasikan konfirmasi dari pengunjung. Admin cukup mengkonfigurasi **satu bank transfer** (nama bank, rekening, nominal) dan **satu social media** (platform, username, link profil, caption) sekali saja, lalu membagikan **satu link publik** ke banyak orang. Setiap pengunjung yang membuka link dapat menekan tombol konfirmasi (**Konfirmasi** untuk transfer bank, **Follow** untuk social media); sistem mencatat foto, lokasi, dan metadata perangkat dari setiap tindakan tersebut.
 
-Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi secara terstruktur sehingga setiap aktivitas konfirmasi dapat tercatat dalam satu dashboard.
+Tujuan utama sistem adalah membantu pengelola dokumentasi bukti (mis. penjual yang menagih transfer dan meminta follow akun sosmed) agar setiap konfirmasi tercatat terstruktur dalam satu dashboard.
 
 ## 2. Tujuan produk
 
 ### Tujuan utama
 
-* Membuat halaman verifikasi transaksi.
-* Mendokumentasikan aktivitas konfirmasi.
-* Menyimpan bukti digital secara terstruktur.
+* Membuat halaman verifikasi bukti (transfer bank & follow social media).
+* Mendokumentasikan setiap konfirmasi pengunjung.
+* Menyimpan bukti digital (foto + lokasi) secara terstruktur.
 * Menampilkan riwayat aktivitas.
 * Menghasilkan laporan dokumentasi.
 
@@ -31,7 +31,7 @@ Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi sec
 * Individu.
 * Pelaku usaha.
 * Admin operasional.
-* Pengguna yang membutuhkan dokumentasi transaksi.
+* Pengguna yang membutuhkan dokumentasi konfirmasi.
 
 ## 3. Ruang lingkup
 
@@ -39,16 +39,16 @@ Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi sec
 
 * Login admin.
 * Dashboard.
-* Manajemen kasus.
-* Link verifikasi unik (dengan opsi regenerate/nonaktifkan).
-* Verification template engine (satu kasus memilih satu template verifikasi).
-* Verifikasi transaksi satu klik (tanpa input manual).
+* Konfigurasi bank transfer (tunggal, dibuat otomatis, data diisi belakangan).
+* Konfigurasi social media (tunggal, dibuat otomatis, data diisi belakangan).
+* Halaman verifikasi publik satu link (`/verify`) yang dipakai bersama.
+* Verifikasi satu klik: **Konfirmasi** (transfer bank) dan **Follow** (social media).
 * Pencatatan metadata perangkat.
 * Lokasi (dengan izin).
 * Foto selfie (dengan izin).
 * Riwayat aktivitas.
 * Export PDF.
-* Halaman error untuk link tidak valid / kedaluwarsa / sudah diverifikasi.
+* Halaman error untuk link tidak aktif / data belum diisi.
 
 ### Di luar ruang lingkup
 
@@ -57,6 +57,8 @@ Tujuan utama sistem adalah membantu pengguna mengelola dokumentasi transaksi sec
 * Integrasi WhatsApp.
 * Notifikasi email.
 * Pembayaran/integrasi payment gateway (sistem hanya mendokumentasikan, tidak memproses transfer).
+* Lebih dari satu konfigurasi per jenis — masing-masing hanya ada **satu** konfigurasi Bank Transfer dan **satu** konfigurasi Social Media.
+* Verifikasi jenis lain selain transfer bank & follow social media.
 
 ## 4. Role pengguna
 
@@ -69,11 +71,11 @@ Admin memiliki akses penuh terhadap seluruh sistem.
 Hak akses:
 
 * Login.
-* Membuat, mengubah, menghapus kasus.
-* Menghasilkan, meregenerasi, dan menonaktifkan link verifikasi.
+* Melengkapi/mengubah konfigurasi bank transfer.
+* Melengkapi/mengubah konfigurasi social media.
+* Mengaktifkan / menonaktifkan (menutup) tiap konfigurasi.
 * Melihat data verifikasi, lokasi, dan foto.
 * Mengunduh laporan PDF.
-* Mengelola status kasus.
 
 ### Pengunjung (tanpa akun)
 
@@ -96,129 +98,132 @@ Tidak ada registrasi publik. Akun admin dibuat melalui database atau seeder.
 
 Widget ringkasan:
 
-* Total kasus.
 * Total verifikasi.
+* Verifikasi bank transfer.
+* Verifikasi social media.
 * Verifikasi hari ini.
 * Lokasi berhasil direkam.
 * Foto berhasil direkam.
 
 Aktivitas terbaru (feed):
 
-* Link dibuat.
+* Konfigurasi bank transfer dibuat/diperbarui.
+* Konfigurasi social media dibuat/diperbarui.
 * Link dibuka.
-* Verifikasi berhasil.
+* Konfirmasi transfer berhasil.
+* Follow social media berhasil.
 
-### 5.3 Manajemen kasus
+### 5.3 Konfigurasi bank transfer
 
-Data kasus:
+Sistem hanya memiliki **satu** konfigurasi bank transfer (singleton).
 
-* Nomor referensi otomatis, format `TRC-YYYYMMDD-0001`.
-* Template verifikasi (dipilih saat membuat kasus).
-* Nama target.
+Perilaku saat inisialisasi:
+
+* Record dibuat otomatis (via seeder) dengan **data kosong** dan status `aktif`.
+* Admin melengkapi data melalui halaman konfigurasi.
+
+Data konfigurasi:
+
 * Nama bank.
 * Nomor rekening.
 * Jumlah transfer.
 * Catatan.
-* Status.
-* Tanggal dibuat.
 
-Status kasus dan transisinya:
+Status konfigurasi:
 
 | Status | Deskripsi | Trigger |
 |---|---|---|
-| `aktif` | Kasus dibuat, link belum pernah dibuka | Setelah kasus & token dibuat |
-| `link_dibuka` | Pengunjung sudah membuka halaman verifikasi minimal 1x, belum klik konfirmasi | Kunjungan pertama ke `/verify/{token}` |
-| `terverifikasi` | Pengunjung berhasil klik tombol konfirmasi sesuai template | Aksi konfirmasi sukses |
-| `ditutup` | Admin menutup kasus secara manual (tidak ada aktivitas lanjutan yang mungkin) | Aksi admin |
-| `kedaluwarsa` *(implisit, ditentukan dari `expires_at`, bukan kolom status terpisah)* | Token sudah lewat 24 jam dan kasus belum `terverifikasi` | Dicek saat token diakses |
+| `aktif` | Section bank transfer tampil di halaman publik `/verify` | Default saat record dibuat |
+| `ditutup` | Section bank transfer disembunyikan dari halaman publik | Aksi admin (menonaktifkan) |
 
-Catatan: `kedaluwarsa` tidak wajib jadi nilai kolom `status` — cukup dihitung dari `expires_at < now()` saat request masuk, supaya status tetap sinkron tanpa perlu scheduled job. Kalau butuh tampil di tabel dashboard sebagai badge terpisah, hitung di accessor model (`isExpired()`), bukan disimpan sebagai status baru.
+Catatan penting:
+
+* Status ini hanya **on/off tampilan section**, bukan status konsumsi — link dipakai bersama banyak pengunjung, jadi tidak ada `terverifikasi`/`link_dibuka` pada konfigurasi.
+* Setiap pengunjung yang menekan tombol **Konfirmasi** menghasilkan satu record verifikasi baru (lihat §5.6).
 
 Fitur:
 
-* Tambah, edit, hapus, lihat detail kasus.
-* Pilih template verifikasi saat membuat/mengubah kasus.
-* Regenerate link (membuat token baru + reset `expires_at`, hanya bisa dilakukan sebelum `terverifikasi`).
-* Nonaktifkan link (set `status = ditutup` tanpa menghapus data kasus/riwayat).
+* Melengkapi data bank transfer.
+* Mengaktifkan / menonaktifkan section.
 
-### 5.4 Link verifikasi unik
+### 5.4 Konfigurasi social media
 
-Setiap kasus memiliki satu token unik yang dipakai sebagai bagian dari URL verifikasi.
+Sistem hanya memiliki **satu** konfigurasi social media (singleton).
 
-Contoh:
+Perilaku saat inisialisasi:
+
+* Record dibuat otomatis (via seeder) dengan **data kosong** dan status `aktif`.
+* Admin melengkapi data melalui halaman konfigurasi.
+
+Data konfigurasi:
+
+* Platform (mis. Instagram, TikTok, X, Facebook, YouTube).
+* Username.
+* Link profil.
+* Instruksi/caption.
+
+Status konfigurasi:
+
+| Status | Deskripsi | Trigger |
+|---|---|---|
+| `aktif` | Section social media tampil di halaman publik `/verify` | Default saat record dibuat |
+| `ditutup` | Section social media disembunyikan dari halaman publik | Aksi admin (menonaktifkan) |
+
+Setiap pengunjung yang menekan tombol **Follow** menghasilkan satu record verifikasi baru (lihat §5.6).
+
+### 5.5 Halaman verifikasi publik
+
+Satu halaman publik dengan satu link:
 
 ```
-https://traceid.app/verify/{token}
+https://traceid.app/verify
 ```
 
-di mana `{token}` adalah string acak 32 karakter (bukan reference number — reference number bersifat human-readable dan tidak digunakan di URL publik agar tidak mudah ditebak/di-enumerate).
+Halaman ini dapat diakses tanpa login. Kontennya ditentukan oleh konfigurasi yang berstatus `aktif`:
 
-Karakteristik:
-
-* Token: 32 karakter random, unik per kasus.
-* Berlaku 24 jam sejak dibuat (`expires_at`), dicek setiap kali token diakses.
-* Setelah kasus berstatus `terverifikasi`, mengakses ulang link menampilkan halaman "sudah diverifikasi" (read-only), bukan form isian ulang.
-* Admin dapat menonaktifkan link kapan saja (§5.3).
-* Admin dapat meregenerasi token jika link lama sudah terlanjur tersebar tapi belum diverifikasi.
-
-### 5.5 Halaman verifikasi transaksi
-
-Halaman ini dapat diakses tanpa login, selama token valid.
-
-**Kondisi token tidak valid** — tampilkan halaman error yang sesuai, bukan 404 generik:
-
-| Kondisi | Pesan yang ditampilkan |
+| Kondisi | Tampilan |
 |---|---|
-| Token tidak ditemukan | "Link verifikasi tidak valid." |
-| Token kedaluwarsa | "Link verifikasi sudah kedaluwarsa. Hubungi pengirim untuk link baru." |
-| Kasus berstatus `ditutup` | "Link ini sudah tidak aktif." |
-| Kasus berstatus `terverifikasi` | Tampilkan ringkasan konfirmasi (read-only), bukan error. |
+| Kedua konfigurasi `ditutup` | Halaman error "Link ini sudah tidak aktif." |
+| Konfigurasi `aktif` dan data lengkap | Section tampil: informasi + tombol aksi |
+| Konfigurasi `aktif` tapi data belum diisi | Section tampil pesan "Informasi belum tersedia. Hubungi pengirim." tanpa tombol |
 
-Informasi yang ditampilkan (untuk token valid, belum diverifikasi) ditentukan oleh template yang dipilih pada kasus.
+Section Bank Transfer menampilkan:
 
-Contoh:
+* Nama bank.
+* Nomor rekening.
+* Jumlah transfer.
+* Tombol **Konfirmasi**.
 
-* Template konfirmasi transfer: nama bank, nomor rekening, jumlah transfer, tombol **Konfirmasi Transfer**.
-* Template konfirmasi penerimaan barang: nomor resi, nama penerima, alamat, tombol **Konfirmasi Penerimaan**.
-* Template verifikasi identitas: nama, nomor referensi, tujuan verifikasi, tombol **Konfirmasi Identitas**.
+Section Social Media menampilkan:
 
-Tombol utama mengikuti template aktif, tetapi perilaku backend tetap sama (one-click confirm).
+* Platform dan username.
+* Link profil (bisa dibuka).
+* Instruksi/caption.
+* Tombol **Follow**.
 
 Alur interaksi publik dibuat sesederhana mungkin:
 
 * Tidak ada field input manual.
-* Pengunjung cukup klik satu tombol konfirmasi sesuai template.
-* Setelah tombol diklik, aplikasi meminta izin lokasi dan kamera dari browser lalu mengirim hasilnya otomatis jika izin diberikan.
+* Pengunjung menekan tombol **Konfirmasi** dan/atau **Follow**.
+* Setelah tombol ditekan, aplikasi meminta izin lokasi dan kamera dari browser lalu mengirim hasilnya otomatis jika izin diberikan.
+* Setiap tombol yang ditekan = satu verifikasi terpisah; pengunjung boleh menekan keduanya.
 
-Setelah aksi konfirmasi sukses: tampilkan halaman terima kasih/ringkasan, ubah status kasus menjadi `terverifikasi`, dan catat timestamp di riwayat aktivitas.
+Setelah aksi sukses: tampilkan halaman terima kasih/ringkasan dan catat timestamp di riwayat aktivitas. Halaman publik tetap bisa dipakai pengunjung lain (link tidak "habis").
 
-### 5.6 Verification template engine
+### 5.6 Pencatatan verifikasi
 
-Satu kasus wajib memilih tepat satu template verifikasi.
+Setiap penekanan tombol (**Konfirmasi** / **Follow**) menyimpan satu record ke tabel `verifications` dengan:
 
-Template yang tersedia pada MVP:
-
-* Konfirmasi transfer.
-* Konfirmasi penerimaan barang.
-* Verifikasi janji temu.
-* Verifikasi dokumen.
-* Verifikasi identitas.
-* Konfirmasi pengambilan.
-
-Prinsip arsitektur:
-
-* Template engine: hanya mengatur konten/teks/tombol/tema halaman publik.
-* Verification engine: menangani validasi token, satu kali konfirmasi, status kasus, dan response API.
-* Evidence engine: menangani metadata perangkat, lokasi, foto, dan penyimpanan bukti.
-
-Konsekuensi desain:
-
-* Yang berubah antar template hanya tampilan publik (UI layer).
-* Proses backend tetap satu jalur dan menyimpan hasil ke tabel `verifications` yang sama.
+* `verification_type`: `bank_transfer` atau `social_media`.
+* `reference_number`: otomatis, format `TRV-YYYYMMDD-0001`, untuk identifikasi di dashboard admin.
+* Foto (jika izin diberikan).
+* Lokasi (jika izin diberikan).
+* Metadata perangkat.
+* Status izin foto & lokasi.
 
 ### 5.7 Pengambilan foto selfie
 
-Setelah tombol konfirmasi ditekan, browser meminta izin kamera.
+Setelah tombol ditekan, browser meminta izin kamera.
 
 Apabila pengguna menyetujui:
 
@@ -233,7 +238,7 @@ Validasi upload:
 * Format: JPEG/PNG/WebP.
 * Ukuran maksimum: 5 MB (sebelum kompresi klien).
 * Maksimal 3 file per verifikasi; file ke-4 dan seterusnya diabaikan.
-* Jika salah satu foto gagal validasi di server, foto yang valid tetap disimpan; jika tidak ada satupun yang valid, verifikasi tetap tersimpan tapi `photo_status = gagal`, tidak membatalkan submit form.
+* Jika salah satu foto gagal validasi di server, foto yang valid tetap disimpan; jika tidak ada satupun yang valid, verifikasi tetap tersimpan tapi `photo_status = gagal`, tidak membatalkan submit.
 
 Data yang disimpan:
 
@@ -270,14 +275,14 @@ Dicatat otomatis dari request, tanpa perlu izin eksplisit:
 Setiap aktivitas dicatat dengan timestamp. Contoh timeline:
 
 ```
-10:15  Link dibuat
+10:15  Konfigurasi bank transfer diperbarui
 10:20  Link dibuka
 10:21  Lokasi diberikan
 10:21  Foto diberikan
-10:22  Verifikasi selesai
+10:22  Konfirmasi transfer berhasil
 ```
 
-Fitur: filter tanggal, pencarian, lihat detail.
+Fitur: filter tanggal, filter jenis, pencarian, lihat detail.
 
 ### 5.11 Peta lokasi
 
@@ -289,8 +294,8 @@ Fitur: marker lokasi, popup informasi (alamat perkiraan via reverse geocoding), 
 
 Isi laporan:
 
-* Detail kasus dan transaksi.
-* Timeline aktivitas.
+* Ringkasan konfigurasi aktif (bank transfer & social media).
+* Daftar/timeline verifikasi.
 * Foto (jika ada, dengan watermark timestamp).
 * Lokasi (peta statis/screenshot, jika ada).
 * Metadata perangkat.
@@ -300,22 +305,22 @@ Isi laporan:
 ### Alur Admin
 
 1. Login.
-2. Membuat kasus (isi data transaksi) → sistem generate `reference_number` + `token` + `expires_at`.
-3. Memilih template verifikasi yang sesuai kebutuhan kasus.
-4. Mengirim link verifikasi ke penerima (di luar sistem — copy-paste manual, sesuai §3 "di luar ruang lingkup" untuk WhatsApp/email otomatis).
-5. Memantau status kasus dari dashboard.
-6. Melihat hasil verifikasi (foto, lokasi, metadata) di halaman detail kasus.
+2. Melengkapi konfigurasi bank transfer (record sudah dibuat otomatis dengan data kosong).
+3. Melengkapi konfigurasi social media.
+4. Membagikan link `/verify` ke pengunjung (di luar sistem — copy-paste manual, sesuai §3).
+5. Memantau verifikasi dari dashboard.
+6. Melihat hasil verifikasi (foto, lokasi, metadata) di halaman detail.
 7. Mengunduh laporan PDF.
 
 ### Alur Pengunjung
 
-1. Membuka link verifikasi.
-2. Sistem validasi token (lihat tabel kondisi di §5.5).
-3. Jika valid: melihat informasi sesuai template, klik tombol konfirmasi sesuai template.
+1. Membuka link `/verify`.
+2. Sistem menampilkan section sesuai konfigurasi yang `aktif` (lihat tabel §5.5).
+3. Menekan tombol **Konfirmasi** (transfer bank) dan/atau **Follow** (social media).
 4. Browser meminta izin lokasi.
 5. Browser meminta izin kamera/foto.
-6. Sistem simpan data verifikasi (termasuk status izin), ubah status kasus jadi `terverifikasi`.
-7. Melihat halaman konfirmasi/terima kasih.
+6. Sistem simpan data verifikasi (termasuk status izin), tampilkan halaman terima kasih.
+7. Pengunjung lain tetap bisa membuka link yang sama dan verifikasi secara mandiri.
 
 ## 7. Struktur database
 
@@ -323,40 +328,47 @@ Isi laporan:
 
 * id, name, email, password, created_at, updated_at
 
-### cases
+### bank_transfers *(singleton — hanya 1 baris, dibuat otomatis via seeder, data kosong)*
 
-* id, template_id, reference_number, target_name, bank_name, account_number, amount, notes, status, token, expires_at, created_at, updated_at
+* id, bank_name, account_number, amount, notes, status, created_at, updated_at
 
-### verification_templates
+### social_media *(singleton — hanya 1 baris, dibuat otomatis via seeder, data kosong)*
 
-* id, name, slug, title, button_text, theme, is_active, created_at, updated_at
+* id, platform, username, profile_url, caption, status, created_at, updated_at
 
 ### verifications
 
-* id, case_id, photo_paths, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
+* id, verification_type, reference_number, photo_paths, latitude, longitude, accuracy, ip_address, browser, operating_system, device_type, language, timezone, screen_resolution, user_agent, photo_status, location_status, created_at
+
+### activity_logs
+
+* id, verification_type, activity, description, created_at
+
+> `verification_type` adalah enum: `bank_transfer` / `social_media`. Tidak ada foreign key ke konfigurasi karena masing-masing konfigurasi hanya satu baris.
+>
+> `photo_paths` adalah JSON array (nullable) yang menampung hingga 3 path foto (§5.7).
 
 > Skema ini konsisten dengan `AGENTS.md` §6. `bigint` auto-increment sebagai PK, snake_case, tanpa UUID/soft delete kecuali diminta.
 
 ## 8. API endpoint
 
-### `POST /verify/{token}`
+### `POST /verify`
 
-Middleware: `throttle` (rate limit), validasi token (bukan Laravel auth — token-based).
+Middleware: `throttle` (rate limit), CSRF.
 
 **Payload** (`multipart/form-data`, karena menyertakan file foto):
 
-Endpoint ini tidak menerima input teks manual dari pengguna; payload diisi otomatis dari hasil izin perangkat/browser.
-
-Endpoint backend ini dipakai untuk semua template; tidak ada endpoint terpisah per template.
-
 ```json
 {
+  "type": "required, in:bank_transfer,social_media",
   "photo": "file[], nullable, maksimal 3 file, image, max:5120 (KB) per file, mimes:jpeg,png,webp",
   "latitude": "numeric, nullable, between:-90,90",
   "longitude": "numeric, nullable, between:-180,180",
   "accuracy": "numeric, nullable"
 }
 ```
+
+Endpoint ini tidak menerima input teks manual dari pengguna selain `type` (diisi otomatis dari tombol yang ditekan); payload lainnya diisi otomatis dari hasil izin perangkat/browser.
 
 **Response sukses (200):**
 
@@ -367,12 +379,12 @@ Endpoint backend ini dipakai untuk semua template; tidak ada endpoint terpisah p
 }
 ```
 
-**Response gagal — token tidak valid (410 Gone):**
+**Response gagal — konfigurasi ditutup / section tidak aktif (410 Gone):**
 
 ```json
 {
   "success": false,
-  "message": "Link verifikasi sudah kedaluwarsa atau tidak valid"
+  "message": "Link ini sudah tidak aktif"
 }
 ```
 
@@ -380,13 +392,12 @@ Endpoint backend ini dipakai untuk semua template; tidak ada endpoint terpisah p
 
 ## 9. Keamanan
 
-* CSRF protection pada form verifikasi (meski token-based, tetap perlu CSRF untuk mencegah cross-site submission).
-* Rate limiting pada endpoint `POST /verify/{token}` (mis. 5 request/menit per IP) untuk mencegah brute-force token atau spam submission.
+* CSRF protection pada form verifikasi.
+* Rate limiting pada halaman dan endpoint `/verify` (GET dan POST, mis. 10 request/menit per IP) untuk mencegah spam submission.
 * Signed URL untuk akses foto dari dashboard admin (bukan public URL permanen).
-* Token expiration (24 jam) dicek di setiap request ke `/verify/{token}`.
 * HTTPS wajib di production.
 * Laravel Validation (Form Request) di semua input, termasuk file upload (tipe & ukuran).
-* Activity logging untuk audit trail (siapa membuka, kapan, dari IP mana).
+* Activity logging untuk audit trail (siapa menekan tombol, kapan, dari IP mana).
 * Middleware `auth` di semua route dashboard admin.
 
 ## 10. Kebutuhan non-fungsional
@@ -400,11 +411,9 @@ Endpoint backend ini dipakai untuk semua template; tidak ada endpoint terpisah p
 
 **Responsif:** Desktop, tablet, mobile (halaman verifikasi harus mobile-first karena mayoritas pengunjung akan membuka dari HP).
 
-**Ketersediaan:** Tidak ada SLA formal untuk MVP, tapi downtime saat token pengunjung aktif harus diminimalkan (idealnya tidak deploy saat ada link yang sedang berlaku, atau pastikan zero-downtime deploy).
+**Ketersediaan:** Tidak ada SLA formal untuk MVP.
 
 **Aksesibilitas dasar:** Tombol konfirmasi harus bisa diakses via keyboard, dan prompt izin perangkat harus memiliki instruksi yang jelas.
-
-Catatan: label tombol mengikuti template (mis. "Konfirmasi Penerimaan", "Konfirmasi Identitas"), namun standar aksesibilitas tetap sama.
 
 **Privasi & retensi data:** Foto dan lokasi hanya dikumpulkan dengan izin eksplisit (lihat §14). Tidak ada kebijakan retensi/penghapusan otomatis di MVP — data disimpan permanen kecuali dihapus manual oleh admin.
 
@@ -412,23 +421,23 @@ Catatan: label tombol mengikuti template (mis. "Konfirmasi Penerimaan", "Konfirm
 
 **Login:** Email, password, tombol login.
 
-**Dashboard:** Statistik, aktivitas terbaru, tombol "Buat Kasus".
+**Dashboard:** Statistik, aktivitas terbaru, tombol "Konfigurasi".
 
-**Kasus (list):** Tabel kasus (dengan filter status dan template), tombol "Generate Link" per baris, tombol detail.
+**Konfigurasi Bank Transfer:** Form data bank (nama bank, rekening, nominal, catatan) + toggle aktif/ditutup + tombol "Salin Link".
 
-**Detail Kasus:** Informasi transaksi, link verifikasi (dengan tombol copy, regenerate, nonaktifkan), riwayat verifikasi, foto, peta lokasi, tombol "Unduh PDF".
+**Konfigurasi Social Media:** Form data (platform, username, link profil, caption) + toggle aktif/ditutup + tombol "Salin Link".
 
-**Halaman Verifikasi (publik):** Informasi sesuai template, tombol konfirmasi sesuai template, prompt izin lokasi, dan prompt izin kamera.
-
-**Halaman Error/Expired (publik):** Pesan sesuai tabel §5.5, tanpa membocorkan detail kasus.
+**Halaman Verifikasi (publik):** Section per konfigurasi aktif — bank transfer (info + tombol **Konfirmasi**) dan social media (info + link profil + tombol **Follow**); prompt izin lokasi dan kamera.
 
 **Halaman Terima Kasih (publik):** Konfirmasi bahwa verifikasi berhasil disimpan, ringkasan singkat (tanpa data sensitif tambahan).
 
+**Halaman Error (publik):** Pesan sesuai tabel §5.5, tanpa membocorkan detail transaksi.
+
 ## 12. Roadmap MVP
 
-**Fase 1** — Login, Dashboard, CRUD kasus, master template verifikasi, Generate link.
+**Fase 1** — Login, Dashboard, konfigurasi bank transfer (auto-created + isi data belakangan), halaman verifikasi publik dasar.
 
-**Fase 2** — Verifikasi satu klik lintas template, metadata perangkat, riwayat aktivitas, halaman error/expired.
+**Fase 2** — Konfigurasi social media, verifikasi satu klik (Konfirmasi/Follow), metadata perangkat, riwayat aktivitas, halaman error.
 
 **Fase 3** — Foto, lokasi, peta, PDF.
 
@@ -437,9 +446,9 @@ Catatan: label tombol mengikuti template (mis. "Konfirmasi Penerimaan", "Konfirm
 ## 13. Indikator keberhasilan
 
 * Admin dapat login.
-* Kasus dapat dibuat dengan reference number yang benar formatnya dan template verifikasi yang aktif.
-* Link verifikasi dapat diakses selama token valid, dan menampilkan halaman yang sesuai (konfirmasi satu klik per template / error / read-only) sesuai kondisi token.
-* Verifikasi berhasil tersimpan setelah klik tombol konfirmasi sesuai template dan status kasus berubah menjadi `terverifikasi`.
+* Konfigurasi bank transfer dan social media tersedia otomatis (data kosong) dan dapat dilengkapi, diubah, serta diaktifkan/dinonaktifkan.
+* Link `/verify` menampilkan section sesuai konfigurasi yang `aktif`.
+* Setiap penekanan tombol **Konfirmasi** / **Follow** menyimpan satu verifikasi dengan `verification_type` dan `reference_number` yang benar.
 * Metadata perangkat tercatat otomatis di setiap kunjungan.
 * Lokasi tercatat jika izin diberikan, status tersimpan dengan benar jika ditolak.
 * Foto tercatat jika izin diberikan dan lolos validasi, status tersimpan dengan benar jika ditolak/gagal.
@@ -452,20 +461,24 @@ Foto dan lokasi hanya dikumpulkan apabila pengguna memberikan izin secara ekspli
 ## 15. Changelog
 
 **v1.1**
-- Perbaikan: contoh link verifikasi sebelumnya memakai reference number (`TRC-8X2A91`), padahal reference number bersifat human-readable dan seharusnya tidak dipakai di URL publik. Diganti memakai token 32-karakter sesuai §5.4 dan `AGENTS.md`.
-- Tambahan: tabel transisi status kasus (§5.3) — sebelumnya status hanya disebutkan tanpa dijelaskan trigger-nya.
-- Tambahan: perilaku saat link diakses ulang setelah `terverifikasi`, dan saat status `ditutup`/kedaluwarsa (§5.5).
-- Tambahan: aturan validasi upload foto (format, ukuran maksimum) — sebelumnya tidak disebutkan.
-- Tambahan: fitur regenerate/nonaktifkan link (§5.3, §5.4) — disebutkan sebagai karakteristik token di v1.0 tapi belum ada di daftar fitur.
-- Perbaikan: format JSON di §8 (sebelumnya key/value tanpa tanda kutip, bukan JSON valid), ditambah response error (410, 422) yang sebelumnya tidak ada.
-- Tambahan: halaman error/expired dan halaman terima kasih di §3 dan §11 — alur sebelumnya berhenti di "Selesai" tanpa menjelaskan apa yang dilihat pengunjung.
-- Tambahan: detail keamanan (rate limit spesifik, signed URL untuk foto) dan kebutuhan non-fungsional (aksesibilitas, retensi data, ketersediaan) yang sebelumnya terlalu tipis.
-- Ditambahkan referensi silang ke `AGENTS.md` supaya roadmap dan skema database tidak perlu dijaga sinkron secara manual di dua tempat.
+- Perbaikan: contoh link verifikasi sebelumnya memakai reference number (`TRC-8X2A91`), padahal reference number bersifat human-readable dan seharusnya tidak dipakai di URL publik. Diganti memakai token 32-karakter.
+- Tambahan: tabel transisi status, perilaku saat link diakses ulang, aturan validasi upload foto, fitur regenerate/nonaktifkan link, response error API, halaman error/expired, detail keamanan dan kebutuhan non-fungsional.
 
 **v1.2**
-- Perubahan: pengambilan foto selfie diubah dari 1 foto menjadi maksimal 3 foto per verifikasi (§5.7). Skema `verifications.photo_path` (single string) diganti `photo_paths` (JSON array, hingga 3 entri) di §7; payload API `photo` menjadi `file[]` maksimal 3 di §8; foto tampil berurutan di detail kasus (§11).
+- Perubahan: pengambilan foto selfie dari 1 foto menjadi maksimal 3 foto per verifikasi (`photo_paths` JSON array).
 
 **v1.3**
-- Tambahan: konsep verification template engine, di mana satu kasus memilih satu template dan halaman publik mengikuti template tersebut (§5.5, §5.6).
-- Tambahan: master data `verification_templates` dan relasi `cases.template_id` untuk mendukung skenario verifikasi lintas kebutuhan tanpa mengubah backend inti (§7).
-- Penegasan: backend verifikasi, pencatatan metadata, lokasi, dan foto tetap satu jalur untuk semua template; yang berubah hanya UI/teks/tombol halaman publik (§5.6, §8).
+- Tambahan: konsep verification template engine dan master data `verification_templates`.
+
+**v2.0**
+- Penghapusan total: konsep `cases`, `verification_templates`, dan verification template engine. Entitas inti diganti `bank_transfers`.
+- Penghapusan: token 32-karakter dan masa berlaku 24 jam. Link verifikasi berbasis `reference_number` dan berlaku sampai `ditutup`/`terverifikasi`.
+- Perubahan: saat membuat bank transfer, data bank dibuat kosong dan diisi admin belakangan.
+
+**v3.0**
+- **Perubahan arsitektur**: tidak lagi per-record. Sistem memiliki **dua konfigurasi tunggal (singleton)** — `bank_transfers` dan `social_media` — masing-masing dibuat otomatis (via seeder) dengan data kosong, mudah dikonfigurasi (§5.3, §5.4, §7).
+- **Penambahan**: konfigurasi social media (platform, username, link profil, caption) dengan tombol **Follow** (§5.4, §5.5).
+- **Perubahan**: satu halaman publik `/verify` yang menampilkan section sesuai konfigurasi `aktif`; tombol **Konfirmasi** (transfer bank) dan **Follow** (social media) (§5.5).
+- **Perubahan**: link dipakai bersama banyak pengunjung — semua pengunjung bisa verifikasi; status konfigurasi hanya `aktif`/`ditutup` (on/off section), bukan status konsumsi (§5.3).
+- **Perubahan**: `verifications` memakai `verification_type` (enum) + `reference_number` format `TRV-YYYYMMDD-0001` menggantikan FK `bank_transfer_id` dan format `TRC-*`; `activity_logs` ikut memakai `verification_type` (§7).
+- Penyesuaian: API endpoint `POST /verify` kini menerima payload `type` (§8), keamanan (hapus response 409 "sudah diverifikasi"), roadmap, tampilan halaman, dan indikator keberhasilan.

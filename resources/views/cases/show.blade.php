@@ -110,7 +110,7 @@
                             </dl>
 
                             {{-- Verification Link --}}
-                            @if ($case->status !== \App\Enums\CaseStatus::Terverifikasi)
+                            @if ($case->status === \App\Enums\CaseStatus::Aktif || $case->status === \App\Enums\CaseStatus::LinkDibuka)
                                 <div class="mt-6 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 rounded-lg border border-indigo-100"
                                      x-data="{ link: '{{ route('verification.show', $case->token) }}', copied: false }">
                                     <p class="text-sm font-medium text-gray-700 flex items-center gap-2">
@@ -129,6 +129,26 @@
                                             <span x-show="copied" x-cloak>{{ __('Tersalin') }}</span>
                                         </button>
                                     </div>
+
+                                    @if ($case->isExpired())
+                                        <p class="mt-3 text-xs font-semibold text-red-600">Link sudah kedaluwarsa.</p>
+                                    @endif
+
+                                    <div class="mt-3 flex flex-wrap items-center gap-2">
+                                        <form method="POST" action="{{ route('cases.regenerate-link', $case) }}">
+                                            @csrf
+                                            <x-secondary-button type="submit">{{ __('Regenerate Link') }}</x-secondary-button>
+                                        </form>
+                                        <form method="POST" action="{{ route('cases.close', $case) }}"
+                                              onsubmit="return confirm('Nonaktifkan link ini?');">
+                                            @csrf
+                                            <x-danger-button>{{ __('Nonaktifkan Link') }}</x-danger-button>
+                                        </form>
+                                    </div>
+                                </div>
+                            @elseif ($case->status === \App\Enums\CaseStatus::Ditutup)
+                                <div class="mt-6 p-4 bg-gray-100 rounded-lg border border-gray-200">
+                                    <p class="text-sm font-medium text-gray-600">Link verifikasi telah dinonaktifkan.</p>
                                 </div>
                             @endif
                         </div>

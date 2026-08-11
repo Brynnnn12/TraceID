@@ -3,11 +3,17 @@ import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-L.Icon.Default.mergeOptions({
+const defaultIcon = L.icon({
     iconUrl: markerIcon,
     iconRetinaUrl: markerIcon2x,
     shadowUrl: markerShadow,
+    iconSize: [25, 41],
+    iconAnchor: [12, 41],
+    popupAnchor: [1, -34],
+    shadowSize: [41, 41],
 });
+
+L.Marker.prototype.options.icon = defaultIcon;
 
 document.addEventListener('alpine:init', () => {
     Alpine.data('leafletMap', (latitude, longitude) => ({
@@ -24,7 +30,9 @@ document.addEventListener('alpine:init', () => {
                 attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(map);
 
-            this.marker = L.marker([this.latitude, this.longitude]).addTo(map);
+            setTimeout(() => map.invalidateSize(), 200);
+
+            this.marker = L.marker([this.latitude, this.longitude], { icon: defaultIcon }).addTo(map);
             this.marker.bindPopup(this.popupContent());
 
             this.reverseGeocode();

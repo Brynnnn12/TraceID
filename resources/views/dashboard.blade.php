@@ -70,7 +70,7 @@
                 <div class="p-6 text-gray-900">
                     <div class="flex items-center justify-between">
                         <h3 class="text-lg font-medium text-gray-900">Aktivitas Terbaru</h3>
-                        <a href="{{ route('cases.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-900">
+                        <a href="{{ route('activities.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-900">
                             Lihat semua
                         </a>
                     </div>

@@ -12,7 +12,7 @@ Aturan pengembangan untuk AI agent (Laravel Boost + Claude Code, dsb.) yang beke
 
 ## 1. Project Overview
 
-**TraceID** adalah aplikasi Laravel untuk dokumentasi dan verifikasi bukti digital transaksi.
+**TraceID** adalah aplikasi Laravel untuk dokumentasi dan verifikasi bukti digital (transfer bank & follow social media).
 
 | Aspek | Pilihan |
 |---|---|
@@ -89,7 +89,7 @@ Jika `.ai/rules` tidak ada, lewati langkah ini.
 ## 4. Standar Kode PHP
 
 - Selalu pakai curly braces untuk semua control structure, termasuk body satu baris.
-- Pakai PHP 8 constructor property promotion: `public function __construct(private CaseService $caseService) {}`. Jangan biarkan `__construct()` kosong tanpa parameter kecuali memang private constructor.
+- Pakai PHP 8 constructor property promotion: `public function __construct(private BankTransferService $bankTransferService) {}`. Jangan biarkan `__construct()` kosong tanpa parameter kecuali memang private constructor.
 - Deklarasikan return type dan type hint eksplisit di semua method: `function isAccessible(User $user, ?string $path = null): bool`.
 - Enum key pakai TitleCase: `FavoritePerson`, `Monthly`.
 - Utamakan PHPDoc block dibanding inline comment; inline comment hanya untuk logic yang benar-benar kompleks. Pakai array shape type di PHPDoc kalau relevan.
@@ -102,9 +102,9 @@ Jika `.ai/rules` tidak ada, lewati langkah ini.
 
 - Buat file baru (migration, controller, model, dst) lewat `php artisan make:...`, bukan manual. Untuk class PHP generic, pakai `php artisan make:class`.
 - **Controller harus tipis** — hanya terima request, panggil service, kembalikan response. Business logic **tidak boleh** ada di controller. Maksimal ±150 baris per controller.
-- **Validasi selalu lewat Form Request** (`StoreCaseRequest`, `UpdateCaseRequest`, `StoreVerificationRequest`, dst). Jangan pakai `->validate()` langsung di controller.
-- **Business logic** ditempatkan di `app/Services`: `CaseService`, `VerificationService`, `PhotoService`, `LocationService`.
-- **Model**: gunakan Eloquent, definisikan semua relationship secara eksplisit (`CaseFile hasMany Verification`, `Verification belongsTo CaseFile`). Gunakan `$fillable`, **jangan** pakai `guarded = []`.
+- **Validasi selalu lewat Form Request** (`UpdateBankTransferRequest`, `UpdateSocialMediaRequest`, `StoreVerificationRequest`, dst). Jangan pakai `->validate()` langsung di controller.
+- **Business logic** ditempatkan di `app/Services`: `VerificationService`, `PhotoService`, `LocationService`.
+- **Model**: `BankTransfer` dan `SocialMedia` adalah konfigurasi **singleton** (1 baris, tanpa relasi FK); `Verification` dan `ActivityLog` berdiri sendiri dan dibedakan via enum `verification_type` (`bank_transfer` / `social_media`). Gunakan `$fillable`, **jangan** pakai `guarded = []`.
 - Saat membuat model baru, sekalian buat factory dan seeder-nya; tanyakan ke user kalau butuh opsi lain (`php artisan make:model --help`).
 - API (jika ada): default pakai Eloquent API Resources + versioning, kecuali route API yang sudah ada tidak melakukan itu — ikuti konvensi yang sudah berjalan.
 - Link ke halaman lain: pakai named route + helper `route()`.
@@ -125,17 +125,26 @@ Jika `.ai/rules` tidak ada, lewati langkah ini.
 users
   id, name, email, password, created_at, updated_at
 
-cases
-  id, reference_number, target_name, bank_name, account_number,
-  amount, notes, token, status, expires_at, created_at, updated_at
+bank_transfers  (singleton — 1 baris, dibuat otomatis via seeder, data kosong)
+  id, bank_name, account_number, amount, notes, status, created_at, updated_at
+
+social_media  (singleton — 1 baris, dibuat otomatis via seeder, data kosong)
+  id, platform, username, profile_url, caption, status, created_at, updated_at
 
 verifications
-  id, case_id, photo_paths, latitude, longitude, accuracy, ip_address,
-  browser, operating_system, device_type, language, timezone,
-  screen_resolution, user_agent, photo_status, location_status, created_at
+  id, verification_type, reference_number, photo_paths, latitude, longitude,
+  accuracy, ip_address, browser, operating_system, device_type, language,
+  timezone, screen_resolution, user_agent, photo_status, location_status, created_at
+
+activity_logs
+  id, verification_type, activity, description, created_at
 ```
 
-> `photo_paths` adalah JSON array (nullable) yang menampung hingga 3 path foto (PRD §5.6).
+> `verification_type` adalah enum (`bank_transfer` / `social_media`); tidak ada FK ke konfigurasi karena masing-masing konfigurasi hanya 1 baris.
+>
+> `photo_paths` adalah JSON array (nullable) yang menampung hingga 3 path foto (PRD §5.7).
+>
+> Data konfigurasi (`bank_name`, `account_number`, `amount`, dst.) sengaja dibuat **kosong** saat inisialisasi, lalu diisi admin belakangan (PRD §5.3, §5.4). Tidak ada `token`/`expires_at` — halaman publik berbasis satu link `/verify` yang dipakai bersama.
 
 Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `database-schema`, jangan hanya mengandalkan tabel di atas (bisa saja sudah berubah).
 
@@ -143,10 +152,10 @@ Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `databa
 
 ## 7. Business Rules
 
-- **Reference number**: format `TRC-YYYYMMDD-0001`.
-- **Token verifikasi**: 32 karakter random, unik, expired 24 jam.
-- **Status kasus**: `aktif` → `link_dibuka` → `terverifikasi` / `ditutup`.
-- **Verifikasi satu klik**: tidak ada field input manual — pengunjung cukup klik **Konfirmasi Transfer**; browser meminta izin lokasi & kamera lalu mengirim hasilnya otomatis.
+- **Konfigurasi bank transfer & social media**: masing-masing **singleton** (1 baris), dibuat otomatis via seeder dengan data kosong, diisi admin belakangan. Status hanya `aktif` / `ditutup` (on/off tampilan section di halaman publik).
+- **Halaman verifikasi publik**: satu link `/verify` dipakai bersama banyak pengunjung; menampilkan section per konfigurasi yang `aktif`. Tombol **Konfirmasi** (bank transfer) dan **Follow** (social media).
+- **Verifikasi per pengunjung**: semua pengunjung bisa verifikasi (link tidak "habis"). Setiap penekanan tombol membuat satu record `verifications` dengan `verification_type` (`bank_transfer` / `social_media`) dan `reference_number` format `TRV-YYYYMMDD-0001`.
+- **Verifikasi satu klik**: tidak ada field input manual — pengunjung klik tombol, browser meminta izin lokasi & kamera lalu mengirim hasilnya otomatis.
 - Foto dan lokasi bersifat **opsional**; status verifikasi tetap tersimpan meskipun user menolak izin kamera/lokasi.
 
 ---
@@ -155,11 +164,11 @@ Sebelum membuat/mengubah migration, cek struktur tabel aktual lewat tool `databa
 
 | Jenis | Contoh |
 |---|---|
-| Model | `CaseFile`, `Verification` |
-| Controller | `CaseController`, `VerificationController` |
-| Form Request | `StoreCaseRequest`, `UpdateCaseRequest` |
-| Route name | `cases.index`, `cases.store`, `verification.show`, `verification.store` |
-| View | `resources/views/cases/index.blade.php`, `.../create.blade.php`, `.../show.blade.php` |
+| Model | `BankTransfer`, `SocialMedia`, `Verification` |
+| Controller | `BankTransferController`, `SocialMediaController`, `VerificationController` |
+| Form Request | `UpdateBankTransferRequest`, `UpdateSocialMediaRequest`, `StoreVerificationRequest` |
+| Route name | `bank-transfer.edit`, `bank-transfer.update`, `social-media.edit`, `social-media.update`, `verification.show`, `verification.store` |
+| View | `resources/views/bank-transfers/edit.blade.php`, `.../social-media/edit.blade.php`, `.../verification/show.blade.php` |
 
 ---
 
@@ -249,8 +258,8 @@ Untuk setiap task baru, ikuti urutan ini — jangan melompat:
 | Step | Scope | Selesai jika... |
 |---|---|---|
 | 1 | Instalasi Laravel + Breeze, auth, dashboard | Login berfungsi |
-| 2 | Migration & model Case, CRUD, generate reference number | CRUD berjalan |
-| 3 | Halaman verifikasi publik, token validation, status "link dibuka" | Link bisa diakses |
+| 2 | Migration & model BankTransfer + SocialMedia (singleton, data kosong), CRUD konfigurasi, generate reference number | Konfigurasi bisa dilengkapi |
+| 3 | Halaman verifikasi publik `/verify` (section per konfigurasi aktif), status "link dibuka" | Link bisa diakses |
 | 4 | Form verifikasi, simpan metadata device/IP/browser | Data tersimpan |
 | 5 | Photo capture, storage, validasi, preview | Foto tersimpan |
 | 6 | Geolocation, peta Leaflet, reverse geocoding | Lokasi tampil |
@@ -278,9 +287,10 @@ Kalau ada ketidakjelasan pada instruksi user, **tanya dulu** sebelum melakukan p
 Satu fitur = satu commit terpisah, pesan commit deskriptif dan konvensional:
 
 ```
-feat: add case migration
-feat: implement case service
-feat: add case CRUD
+feat: add bank transfer & social media migration
+feat: implement verification service
+feat: add bank transfer config
+feat: add social media config
 fix: validation on verification form
 ```
 

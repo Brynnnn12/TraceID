@@ -12,6 +12,8 @@
                     <form method="POST" action="{{ route('cases.store') }}" class="space-y-6">
                         @csrf
                         @include('cases._form', [
+                            'case' => null,
+                            'templates' => $templates,
                             'form' => [
                                 'templateId' => (string) old('template_id', ''),
                                 'fields' => old('fields', []),

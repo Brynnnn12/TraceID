@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityController;
 use App\Http\Controllers\CaseController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
@@ -27,9 +28,16 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+
     Route::get('/verifications/{verification}/photo', [VerificationController::class, 'photo'])
         ->middleware('signed')
         ->name('verification.photo');
+
+    Route::post('/cases/{case}/regenerate-link', [CaseController::class, 'regenerateLink'])
+        ->name('cases.regenerate-link');
+    Route::post('/cases/{case}/close', [CaseController::class, 'close'])
+        ->name('cases.close');
 
     Route::resource('cases', CaseController::class);
 });

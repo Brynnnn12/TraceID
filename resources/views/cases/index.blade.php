@@ -21,6 +21,35 @@
 
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+                    <form method="GET" action="{{ route('cases.index') }}" class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div>
+                            <select name="status"
+                                    class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                <option value="">{{ __('Semua Status') }}</option>
+                                @foreach ($statuses as $status)
+                                    <option value="{{ $status->value }}" @selected($filters['status'] === $status->value)>
+                                        {{ $status->label() }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <select name="template"
+                                    class="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-sm">
+                                <option value="">{{ __('Semua Template') }}</option>
+                                @foreach ($templates as $template)
+                                    <option value="{{ $template->id }}" @selected((string) $filters['template'] === (string) $template->id)>
+                                        {{ $template->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <x-primary-button>{{ __('Filter') }}</x-primary-button>
+                            <a href="{{ route('cases.index') }}" class="text-sm text-gray-600 hover:text-gray-900">{{ __('Reset') }}</a>
+                        </div>
+                    </form>
+
                     @if ($cases->isEmpty())
                         <p class="text-gray-500">Belum ada kasus.</p>
                     @else
