@@ -3,36 +3,32 @@
 namespace App\Services;
 
 use App\Enums\ActivityType;
+use App\Enums\VerificationType;
 use App\Models\ActivityLog;
-use App\Models\CaseFile;
 use Illuminate\Database\Eloquent\Builder;
 
 class ActivityService
 {
-    public function record(CaseFile $case, ActivityType $type, ?string $description = null): ActivityLog
+    public function record(?VerificationType $type, ActivityType $activity, ?string $description = null): ActivityLog
     {
-        return $case->activities()->create([
-            'activity' => $type,
+        return ActivityLog::create([
+            'verification_type' => $type,
+            'activity' => $activity,
             'description' => $description,
         ]);
     }
 
     /**
-     * @param  array{search?: ?string, from?: ?string, to?: ?string}  $filters
+     * @param  array{search?: ?string, type?: ?string, from?: ?string, to?: ?string}  $filters
      */
     public function paginate(array $filters = [], int $perPage = 20)
     {
         return ActivityLog::query()
-            ->with('case')
             ->when(! blank($filters['search'] ?? null), function (Builder $query) use ($filters) {
-                $search = trim((string) $filters['search']);
-
-                $query->where(function (Builder $sub) use ($search) {
-                    $sub->where('description', 'like', "%{$search}%")
-                        ->orWhereHas('case', function (Builder $case) use ($search) {
-                            $case->where('reference_number', 'like', "%{$search}%");
-                        });
-                });
+                $query->where('description', 'like', '%'.trim((string) $filters['search']).'%');
+            })
+            ->when(filled($filters['type'] ?? null), function (Builder $query) use ($filters) {
+                $query->where('verification_type', $filters['type']);
             })
             ->when(! blank($filters['from'] ?? null), function (Builder $query) use ($filters) {
                 $query->whereDate('created_at', '>=', $filters['from']);

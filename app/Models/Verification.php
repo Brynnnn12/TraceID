@@ -4,10 +4,10 @@ namespace App\Models;
 
 use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
+use App\Enums\VerificationType;
 use Database\Factories\VerificationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Verification extends Model
 {
@@ -20,7 +20,8 @@ class Verification extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'case_id',
+        'verification_type',
+        'reference_number',
         'photo_paths',
         'latitude',
         'longitude',
@@ -43,6 +44,7 @@ class Verification extends Model
     protected function casts(): array
     {
         return [
+            'verification_type' => VerificationType::class,
             'photo_paths' => 'array',
             'latitude' => 'decimal:7',
             'longitude' => 'decimal:7',
@@ -52,8 +54,8 @@ class Verification extends Model
         ];
     }
 
-    public function case(): BelongsTo
+    public function hasCoordinates(): bool
     {
-        return $this->belongsTo(CaseFile::class, 'case_id');
+        return $this->latitude !== null && $this->longitude !== null;
     }
 }

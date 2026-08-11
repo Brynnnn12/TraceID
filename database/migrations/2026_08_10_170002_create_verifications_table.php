@@ -13,7 +13,8 @@ return new class extends Migration
     {
         Schema::create('verifications', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('case_id')->constrained()->cascadeOnDelete();
+            $table->string('verification_type');
+            $table->string('reference_number')->unique();
             $table->json('photo_paths')->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
@@ -29,6 +30,8 @@ return new class extends Migration
             $table->string('photo_status')->nullable();
             $table->string('location_status')->nullable();
             $table->timestamp('created_at')->nullable();
+
+            $table->index(['verification_type', 'created_at']);
         });
     }
 

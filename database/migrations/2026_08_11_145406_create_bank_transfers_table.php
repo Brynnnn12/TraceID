@@ -11,14 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('verification_templates', function (Blueprint $table) {
+        Schema::create('bank_transfers', function (Blueprint $table) {
             $table->id();
-            $table->string('name');
-            $table->string('slug')->unique();
-            $table->string('title');
-            $table->string('button_text');
-            $table->string('theme')->default('indigo');
-            $table->boolean('is_active')->default(true);
+            $table->string('bank_name')->nullable();
+            $table->string('account_number')->nullable();
+            $table->decimal('amount', 15, 2)->nullable();
+            $table->text('notes')->nullable();
+            $table->string('status')->default('aktif');
             $table->timestamps();
         });
     }
@@ -28,6 +27,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('verification_templates');
+        Schema::dropIfExists('bank_transfers');
     }
 };

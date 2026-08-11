@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\ActivityType;
+use App\Enums\VerificationType;
 use Database\Factories\ActivityLogFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ActivityLog extends Model
 {
@@ -19,7 +19,7 @@ class ActivityLog extends Model
      * @var list<string>
      */
     protected $fillable = [
-        'case_id',
+        'verification_type',
         'activity',
         'description',
     ];
@@ -30,12 +30,8 @@ class ActivityLog extends Model
     protected function casts(): array
     {
         return [
+            'verification_type' => VerificationType::class,
             'activity' => ActivityType::class,
         ];
-    }
-
-    public function case(): BelongsTo
-    {
-        return $this->belongsTo(CaseFile::class, 'case_id');
     }
 }

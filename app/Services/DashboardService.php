@@ -2,24 +2,24 @@
 
 namespace App\Services;
 
-use App\Enums\CaseStatus;
 use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
+use App\Enums\VerificationType;
 use App\Models\ActivityLog;
-use App\Models\CaseFile;
 use App\Models\Verification;
 use Illuminate\Database\Eloquent\Collection;
 
 class DashboardService
 {
     /**
-     * @return array{total_cases: int, total_verifications: int, verifications_today: int, locations_recorded: int, photos_recorded: int}
+     * @return array{total_verifications: int, bank_transfer_verifications: int, social_media_verifications: int, verifications_today: int, locations_recorded: int, photos_recorded: int}
      */
     public function statistics(): array
     {
         return [
-            'total_cases' => CaseFile::count(),
             'total_verifications' => Verification::count(),
+            'bank_transfer_verifications' => Verification::where('verification_type', VerificationType::BankTransfer)->count(),
+            'social_media_verifications' => Verification::where('verification_type', VerificationType::SocialMedia)->count(),
             'verifications_today' => Verification::whereDate('created_at', today())->count(),
             'locations_recorded' => Verification::where('location_status', LocationStatus::Diberikan)->count(),
             'photos_recorded' => Verification::where('photo_status', PhotoStatus::Diberikan)->count(),
@@ -54,17 +54,15 @@ class DashboardService
     /**
      * @return array{labels: list<string>, data: list<int>}
      */
-    public function casesByStatus(): array
+    public function verificationsByType(): array
     {
-        $labels = [];
-        $data = [];
-
-        foreach (CaseStatus::cases() as $status) {
-            $labels[] = $status->label();
-            $data[] = CaseFile::where('status', $status)->count();
-        }
-
-        return ['labels' => $labels, 'data' => $data];
+        return [
+            'labels' => [VerificationType::BankTransfer->label(), VerificationType::SocialMedia->label()],
+            'data' => [
+                Verification::where('verification_type', VerificationType::BankTransfer)->count(),
+                Verification::where('verification_type', VerificationType::SocialMedia)->count(),
+            ],
+        ];
     }
 
     /**
@@ -73,7 +71,6 @@ class DashboardService
     public function recentActivities(int $limit = 10): Collection
     {
         return ActivityLog::query()
-            ->with('case')
             ->latest('created_at')
             ->limit($limit)
             ->get();

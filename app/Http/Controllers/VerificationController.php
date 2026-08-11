@@ -2,9 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\CaseStatus;
-use App\Exceptions\VerificationLinkException;
+use App\Enums\VerificationType;
 use App\Http\Requests\StoreVerificationRequest;
+use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 use App\Models\Verification;
 use App\Services\VerificationService;
 use Illuminate\Http\Request;
@@ -14,36 +15,39 @@ class VerificationController extends Controller
 {
     public function __construct(private readonly VerificationService $verificationService) {}
 
-    public function show(string $token)
+    public function show(Request $request)
     {
-        try {
-            $case = $this->verificationService->resolveToken($token);
-        } catch (VerificationLinkException $e) {
-            return view('verification.error', ['message' => $e->getMessage()]);
+        if (! $this->verificationService->isLinkActive()) {
+            return view('verification.error', ['message' => 'Link ini sudah tidak aktif.']);
         }
 
-        if ($case->status === CaseStatus::Terverifikasi) {
-            return view('verification.already-verified', ['case' => $case]);
-        }
+        $this->verificationService->recordLinkOpened($request);
 
-        return view('verification.show', ['case' => $case]);
+        return view('verification.show', [
+            'bankTransfer' => BankTransfer::first(),
+            'socialMedia' => SocialMedia::first(),
+        ]);
     }
 
-    public function store(StoreVerificationRequest $request, string $token)
+    public function store(StoreVerificationRequest $request)
     {
-        try {
-            $case = $this->verificationService->resolveToken($token);
-        } catch (VerificationLinkException $e) {
-            return view('verification.error', ['message' => $e->getMessage()]);
+        $type = VerificationType::from($request->validated('type'));
+
+        if (! $this->verificationService->isSectionActive($type)) {
+            if ($request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => 'Link ini sudah tidak aktif.'], 410);
+            }
+
+            return view('verification.error', ['message' => 'Link ini sudah tidak aktif.']);
         }
 
-        if ($case->status === CaseStatus::Terverifikasi) {
-            return view('verification.already-verified', ['case' => $case]);
+        $verification = $this->verificationService->recordVerification($type, $request->validated(), $request);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'Verifikasi berhasil']);
         }
 
-        $verification = $this->verificationService->recordVerification($case, $request->validated(), $request);
-
-        return view('verification.success', ['case' => $case, 'verification' => $verification]);
+        return view('verification.success', compact('verification'));
     }
 
     public function photo(Request $request, Verification $verification)

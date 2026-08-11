@@ -3,14 +3,18 @@
 namespace App\Services;
 
 use App\Enums\ActivityType;
-use App\Enums\CaseStatus;
+use App\Enums\ConfigStatus;
 use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
-use App\Exceptions\VerificationLinkException;
-use App\Models\CaseFile;
+use App\Enums\VerificationType;
+use App\Models\ActivityLog;
+use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 use App\Models\Verification;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class VerificationService
 {
@@ -19,45 +23,54 @@ class VerificationService
         private readonly ActivityService $activityService,
     ) {}
 
-    public function resolveToken(string $token): CaseFile
+    public function isLinkActive(): bool
     {
-        $case = CaseFile::where('token', $token)->first();
-
-        if ($case === null) {
-            throw new VerificationLinkException('Link verifikasi tidak valid.');
-        }
-
-        if ($case->status === CaseStatus::Ditutup) {
-            throw new VerificationLinkException('Link ini sudah tidak aktif.');
-        }
-
-        if ($case->isExpired()) {
-            throw new VerificationLinkException('Link verifikasi sudah kedaluwarsa. Hubungi pengirim untuk link baru.');
-        }
-
-        if ($case->status === CaseStatus::Aktif) {
-            $case->update(['status' => CaseStatus::LinkDibuka]);
-            $this->activityService->record($case, ActivityType::LinkDibuka);
-        }
-
-        return $case;
+        return $this->hasActiveConfig(BankTransfer::query())
+            || $this->hasActiveConfig(SocialMedia::query());
     }
 
-    public function verificationUrl(CaseFile $case): string
+    public function isSectionActive(VerificationType $type): bool
     {
-        return route('verification.show', $case->token);
+        return $this->hasActiveConfig(
+            $type === VerificationType::BankTransfer ? BankTransfer::query() : SocialMedia::query(),
+        );
+    }
+
+    public function recordLinkOpened(Request $request): void
+    {
+        $ip = $request->ip();
+
+        $exists = ActivityLog::query()
+            ->where('activity', ActivityType::LinkDibuka)
+            ->where('description', $ip)
+            ->exists();
+
+        if (! $exists) {
+            $this->activityService->record(null, ActivityType::LinkDibuka, $ip);
+        }
+    }
+
+    public function generateReferenceNumber(): string
+    {
+        $prefix = 'TRV-'.now()->format('Ymd').'-';
+
+        $last = Verification::query()
+            ->where('reference_number', 'like', $prefix.'%')
+            ->orderByDesc('reference_number')
+            ->value('reference_number');
+
+        $sequence = $last !== null ? ((int) Str::afterLast($last, '-')) + 1 : 1;
+
+        return $prefix.Str::padLeft((string) $sequence, 4, '0');
     }
 
     /**
      * @param  array<string, mixed>  $validated
      */
-    public function recordVerification(CaseFile $case, array $validated, Request $request): Verification
+    public function recordVerification(VerificationType $type, array $validated, Request $request): Verification
     {
-        return DB::transaction(function () use ($case, $validated, $request): Verification {
-            $photos = $request->file('photo');
-            $photos = is_array($photos) ? $photos : [$photos];
-
-            $photo = $this->photoService->store(array_filter($photos));
+        return DB::transaction(function () use ($type, $validated, $request): Verification {
+            $photo = $this->photoService->store($this->photosFrom($request));
 
             $photoStatus = $photo['photo_status'] ?? null;
 
@@ -65,7 +78,9 @@ class VerificationService
                 $photoStatus = PhotoStatus::Ditolak;
             }
 
-            $verification = $case->verifications()->create([
+            $verification = Verification::create([
+                'verification_type' => $type,
+                'reference_number' => $this->generateReferenceNumber(),
                 'photo_paths' => $photo['photo_paths'] ?? null,
                 'photo_status' => $photoStatus,
                 'latitude' => $validated['latitude'] ?? null,
@@ -79,25 +94,46 @@ class VerificationService
                 ...$this->captureDeviceMetadata($request),
             ]);
 
-            $case->update(['status' => CaseStatus::Terverifikasi]);
-
-            $this->recordActivities($case, $verification);
+            $this->recordActivities($type, $verification);
 
             return $verification;
         });
     }
 
-    private function recordActivities(CaseFile $case, Verification $verification): void
+    private function hasActiveConfig(Builder $query): bool
     {
-        $this->activityService->record($case, ActivityType::VerifikasiSelesai);
+        return $query->where('status', ConfigStatus::Aktif)->exists();
+    }
+
+    private function recordActivities(VerificationType $type, Verification $verification): void
+    {
+        $this->activityService->record(
+            $type,
+            $type === VerificationType::BankTransfer ? ActivityType::KonfirmasiTransfer : ActivityType::FollowSocialMedia,
+            $verification->reference_number,
+        );
 
         if ($verification->photo_status === PhotoStatus::Diberikan) {
-            $this->activityService->record($case, ActivityType::FotoDiberikan);
+            $this->activityService->record($type, ActivityType::FotoDiberikan, $verification->reference_number);
         }
 
         if ($verification->location_status === LocationStatus::Diberikan) {
-            $this->activityService->record($case, ActivityType::LokasiDiberikan);
+            $this->activityService->record($type, ActivityType::LokasiDiberikan, $verification->reference_number);
         }
+    }
+
+    /**
+     * @return list<\Illuminate\Http\UploadedFile>
+     */
+    private function photosFrom(Request $request): array
+    {
+        $photos = $request->file('photo');
+
+        if ($photos === null) {
+            return [];
+        }
+
+        return is_array($photos) ? $photos : [$photos];
     }
 
     /**
@@ -105,7 +141,9 @@ class VerificationService
      */
     private function locationStatus(array $validated): ?LocationStatus
     {
-        $explicit = LocationStatus::tryFrom($validated['location_status'] ?? '');
+        $explicit = isset($validated['location_status'])
+            ? LocationStatus::tryFrom((string) $validated['location_status'])
+            : null;
 
         if ($explicit !== null) {
             return $explicit;

@@ -13,12 +13,12 @@ return new class extends Migration
     {
         Schema::create('activity_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('case_id')->constrained()->cascadeOnDelete();
+            $table->string('verification_type')->nullable();
             $table->string('activity');
             $table->string('description')->nullable();
             $table->timestamp('created_at')->nullable();
 
-            $table->index(['case_id', 'created_at']);
+            $table->index(['verification_type', 'created_at']);
         });
     }
 
