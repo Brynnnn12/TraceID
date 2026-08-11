@@ -15,11 +15,20 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    <x-nav-link :href="route('cases.index')" :active="request()->routeIs('cases.*')">
-                        {{ __('Kasus') }}
+                    <x-nav-link :href="route('bank-transfer.edit')" :active="request()->routeIs('bank-transfer.*')">
+                        {{ __('Bank Transfer') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('social-media.edit')" :active="request()->routeIs('social-media.*')">
+                        {{ __('Social Media') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('verifications.index')" :active="request()->routeIs('verifications.*')">
+                        {{ __('Verifikasi') }}
                     </x-nav-link>
                     <x-nav-link :href="route('activities.index')" :active="request()->routeIs('activities.*')">
                         {{ __('Aktivitas') }}
+                    </x-nav-link>
+                    <x-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                        {{ __('Laporan') }}
                     </x-nav-link>
                 </div>
             </div>
@@ -76,11 +85,20 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
-            <x-responsive-nav-link :href="route('cases.index')" :active="request()->routeIs('cases.*')">
-                {{ __('Kasus') }}
+            <x-responsive-nav-link :href="route('bank-transfer.edit')" :active="request()->routeIs('bank-transfer.*')">
+                {{ __('Bank Transfer') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('social-media.edit')" :active="request()->routeIs('social-media.*')">
+                {{ __('Social Media') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('verifications.index')" :active="request()->routeIs('verifications.*')">
+                {{ __('Verifikasi') }}
             </x-responsive-nav-link>
             <x-responsive-nav-link :href="route('activities.index')" :active="request()->routeIs('activities.*')">
                 {{ __('Aktivitas') }}
+            </x-responsive-nav-link>
+            <x-responsive-nav-link :href="route('reports.index')" :active="request()->routeIs('reports.*')">
+                {{ __('Laporan') }}
             </x-responsive-nav-link>
         </div>
 

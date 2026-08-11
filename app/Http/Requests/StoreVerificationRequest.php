@@ -41,7 +41,7 @@ class StoreVerificationRequest extends FormRequest
     {
         return [
             'type' => ['required', new Enum(VerificationType::class)],
-            'photo' => ['nullable', 'array'],
+            'photo' => ['nullable'],
             'photo_status' => ['nullable', new Enum(PhotoStatus::class)],
             'location_status' => ['nullable', new Enum(LocationStatus::class)],
             'latitude' => ['nullable', 'numeric', 'between:-90,90'],

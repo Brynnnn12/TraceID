@@ -3,8 +3,8 @@
 namespace Database\Factories;
 
 use App\Enums\ActivityType;
+use App\Enums\VerificationType;
 use App\Models\ActivityLog;
-use App\Models\CaseFile;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,9 +20,10 @@ class ActivityLogFactory extends Factory
     public function definition(): array
     {
         return [
-            'case_id' => CaseFile::factory(),
-            'activity' => ActivityType::LinkDibuat,
+            'verification_type' => fake()->randomElement(VerificationType::cases()),
+            'activity' => fake()->randomElement(ActivityType::cases()),
             'description' => null,
+            'created_at' => now(),
         ];
     }
 }

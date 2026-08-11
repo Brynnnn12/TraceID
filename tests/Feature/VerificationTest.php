@@ -1,62 +1,60 @@
 <?php
 
-use App\Enums\CaseStatus;
-use App\Models\CaseFile;
+use App\Enums\ActivityType;
+use App\Models\ActivityLog;
+use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 
-test('visitor can open a valid verification link', function () {
-    $case = CaseFile::factory()->create();
+test('the root path redirects to the public verification page', function () {
+    $this->get('/')->assertRedirect(route('verification.show'));
+});
 
-    $this->get(route('verification.show', $case->token))
+test('visitor can open the public verification page with active configurations', function () {
+    BankTransfer::factory()->configured()->create();
+    SocialMedia::factory()->configured()->create();
+
+    $this->get(route('verification.show'))
         ->assertOk()
-        ->assertSee($case->fieldValue('target_name'))
-        ->assertSee($case->reference_number);
+        ->assertSee('Bank Transfer')
+        ->assertSee('Konfirmasi')
+        ->assertSee('Social Media')
+        ->assertSee('Follow');
 });
 
-test('opening a valid link marks the case as link_dibuka', function () {
-    $case = CaseFile::factory()->create(['status' => CaseStatus::Aktif]);
+test('an active but incomplete configuration shows the unavailable message', function () {
+    BankTransfer::factory()->create();
+    SocialMedia::factory()->create();
 
-    $this->get(route('verification.show', $case->token));
-
-    expect($case->fresh()->status)->toBe(CaseStatus::LinkDibuka);
-});
-
-test('revisiting an open link keeps the link_dibuka status', function () {
-    $case = CaseFile::factory()->create(['status' => CaseStatus::LinkDibuka]);
-
-    $this->get(route('verification.show', $case->token))
-        ->assertOk();
-
-    expect($case->fresh()->status)->toBe(CaseStatus::LinkDibuka);
-});
-
-test('invalid token shows an error page', function () {
-    $this->get('/verify/nonexistent-token')
+    $this->get(route('verification.show'))
         ->assertOk()
-        ->assertSee('Link verifikasi tidak valid.');
+        ->assertSee('Informasi belum tersedia. Hubungi pengirim.');
 });
 
-test('expired token shows an expired message', function () {
-    $case = CaseFile::factory()->create(['expires_at' => now()->subMinute()]);
+test('a closed configuration section is hidden from the public page', function () {
+    BankTransfer::factory()->configured()->ditutup()->create();
+    SocialMedia::factory()->configured()->create();
 
-    $this->get(route('verification.show', $case->token))
+    $this->get(route('verification.show'))
         ->assertOk()
-        ->assertSee('Link verifikasi sudah kedaluwarsa. Hubungi pengirim untuk link baru.');
+        ->assertDontSee('Konfirmasi')
+        ->assertSee('Follow');
 });
 
-test('closed case link shows an inactive message', function () {
-    $case = CaseFile::factory()->create(['status' => CaseStatus::Ditutup]);
+test('opening the link records a link_dibuka activity once per visitor', function () {
+    BankTransfer::factory()->create();
+    SocialMedia::factory()->create();
 
-    $this->get(route('verification.show', $case->token))
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.10'])->get(route('verification.show'));
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.0.10'])->get(route('verification.show'));
+
+    expect(ActivityLog::where('activity', ActivityType::LinkDibuka)->count())->toBe(1);
+});
+
+test('the link is inactive when all configurations are closed', function () {
+    BankTransfer::factory()->ditutup()->create();
+    SocialMedia::factory()->ditutup()->create();
+
+    $this->get(route('verification.show'))
         ->assertOk()
         ->assertSee('Link ini sudah tidak aktif.');
-});
-
-test('already verified link shows a read-only summary', function () {
-    $case = CaseFile::factory()->create(['status' => CaseStatus::Terverifikasi]);
-
-    $this->get(route('verification.show', $case->token))
-        ->assertOk()
-        ->assertSee('Sudah Diverifikasi')
-        ->assertSee($case->reference_number)
-        ->assertDontSee('Nama Pengirim');
 });

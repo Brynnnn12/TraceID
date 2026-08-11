@@ -1,22 +1,22 @@
 <?php
 
 use App\Http\Controllers\ActivityController;
-use App\Http\Controllers\CaseController;
+use App\Http\Controllers\BankTransferController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\SocialMediaController;
 use App\Http\Controllers\VerificationController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
+Route::redirect('/', '/verify');
 
-Route::get('/verify/{token}', [VerificationController::class, 'show'])
-    ->middleware('throttle:20,1')
+Route::get('/verify', [VerificationController::class, 'show'])
+    ->middleware('throttle:10,1')
     ->name('verification.show');
 
-Route::post('/verify/{token}', [VerificationController::class, 'store'])
-    ->middleware('throttle:5,1')
+Route::post('/verify', [VerificationController::class, 'store'])
+    ->middleware('throttle:10,1')
     ->name('verification.store');
 
 Route::get('/dashboard', [DashboardController::class, 'index'])
@@ -28,18 +28,23 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    Route::get('/bank-transfer', [BankTransferController::class, 'edit'])->name('bank-transfer.edit');
+    Route::put('/bank-transfer', [BankTransferController::class, 'update'])->name('bank-transfer.update');
+
+    Route::get('/social-media', [SocialMediaController::class, 'edit'])->name('social-media.edit');
+    Route::put('/social-media', [SocialMediaController::class, 'update'])->name('social-media.update');
+
     Route::get('/activities', [ActivityController::class, 'index'])->name('activities.index');
+
+    Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+    Route::get('/reports/download', [ReportController::class, 'download'])->name('reports.download');
+
+    Route::get('/verifications', [VerificationController::class, 'index'])->name('verifications.index');
+    Route::get('/verifications/{verification}', [VerificationController::class, 'detail'])->name('verifications.show');
 
     Route::get('/verifications/{verification}/photo', [VerificationController::class, 'photo'])
         ->middleware('signed')
         ->name('verification.photo');
-
-    Route::post('/cases/{case}/regenerate-link', [CaseController::class, 'regenerateLink'])
-        ->name('cases.regenerate-link');
-    Route::post('/cases/{case}/close', [CaseController::class, 'close'])
-        ->name('cases.close');
-
-    Route::resource('cases', CaseController::class);
 });
 
 require __DIR__.'/auth.php';

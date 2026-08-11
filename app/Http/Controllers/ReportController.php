@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\VerificationType;
 use App\Http\Requests\DownloadReportRequest;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
@@ -14,6 +15,7 @@ class ReportController extends Controller
     {
         return view('reports.index', [
             'filters' => $request->only(['from', 'to', 'type']),
+            'types' => VerificationType::cases(),
         ]);
     }
 

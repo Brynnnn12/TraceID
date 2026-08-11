@@ -8,8 +8,10 @@ use App\Models\BankTransfer;
 use App\Models\SocialMedia;
 use App\Models\Verification;
 use App\Services\VerificationService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 class VerificationController extends Controller
 {
@@ -26,6 +28,35 @@ class VerificationController extends Controller
         return view('verification.show', [
             'bankTransfer' => BankTransfer::first(),
             'socialMedia' => SocialMedia::first(),
+        ]);
+    }
+
+    public function index(Request $request)
+    {
+        $verifications = Verification::query()
+            ->when(filled($request->query('type')), function (Builder $query) use ($request) {
+                $query->where('verification_type', $request->query('type'));
+            })
+            ->latest('created_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('verifications.index', [
+            'verifications' => $verifications,
+            'types' => VerificationType::cases(),
+            'filters' => $request->only('type'),
+        ]);
+    }
+
+    public function detail(Verification $verification)
+    {
+        return view('verifications.show', [
+            'verification' => $verification,
+            'photos' => collect($verification->photo_paths ?? [])->map(function (string $path, int $index) use ($verification) {
+                return [
+                    'url' => URL::signedRoute('verification.photo', ['verification' => $verification->id, 'photo' => $index]),
+                ];
+            }),
         ]);
     }
 

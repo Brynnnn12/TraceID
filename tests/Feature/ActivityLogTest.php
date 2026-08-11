@@ -1,75 +1,64 @@
 <?php
 
 use App\Enums\ActivityType;
-use App\Enums\CaseStatus;
-use App\Models\CaseFile;
+use App\Models\ActivityLog;
+use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 use App\Models\User;
-use App\Models\VerificationTemplate;
-use App\Services\CaseService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
-test('creating a case records a link_dibuat activity', function () {
-    $template = VerificationTemplate::factory()->create();
+test('opening the verification link records a link_dibuka activity', function () {
+    BankTransfer::factory()->create();
+    SocialMedia::factory()->create();
 
-    $case = app(CaseService::class)->create([
-        'template_id' => $template->id,
-        'fields' => [
-            'target_name' => 'Budi Santoso',
-            'bank_name' => 'BCA',
-            'account_number' => '1234567890',
-            'amount' => 100000,
-        ],
-    ]);
+    $this->get(route('verification.show'));
 
-    expect($case->activities()->where('activity', ActivityType::LinkDibuat)->count())->toBe(1);
+    expect(ActivityLog::where('activity', ActivityType::LinkDibuka)->count())->toBe(1);
 });
 
-test('opening a verification link records a link_dibuka activity', function () {
-    $case = CaseFile::factory()->create();
+test('submitting a bank transfer verification records a konfirmasi_transfer activity', function () {
+    BankTransfer::factory()->configured()->create();
 
-    $this->get(route('verification.show', $case->token));
+    $this->post(route('verification.store'), ['type' => 'bank_transfer'])->assertOk();
 
-    expect($case->fresh()->activities()->where('activity', ActivityType::LinkDibuka)->count())->toBe(1);
+    expect(ActivityLog::where('activity', ActivityType::KonfirmasiTransfer)->count())->toBe(1);
 });
 
-test('revisiting an open link does not duplicate the link_dibuka activity', function () {
-    $case = CaseFile::factory()->create();
+test('submitting a social media verification records a follow_social_media activity', function () {
+    SocialMedia::factory()->configured()->create();
 
-    $this->get(route('verification.show', $case->token));
-    $this->get(route('verification.show', $case->token));
+    $this->post(route('verification.store'), ['type' => 'social_media'])->assertOk();
 
-    expect($case->fresh()->activities()->where('activity', ActivityType::LinkDibuka)->count())->toBe(1);
+    expect(ActivityLog::where('activity', ActivityType::FollowSocialMedia)->count())->toBe(1);
 });
 
-test('verifying a case records verifikasi_selesai, lokasi, and foto activities', function () {
+test('verification with photo and location records foto and lokasi activities', function () {
     Storage::fake('private');
 
-    $case = CaseFile::factory()->create();
+    BankTransfer::factory()->configured()->create();
 
-    $this->post(route('verification.store', $case->token), [
+    $this->post(route('verification.store'), [
+        'type' => 'bank_transfer',
         'latitude' => -6.2,
         'longitude' => 106.816,
         'photo' => UploadedFile::fake()->image('selfie.jpg', 400, 400),
     ])->assertOk();
 
-    $activities = $case->fresh()->activities;
+    $activities = ActivityLog::all();
 
-    expect($activities->contains(fn ($activity) => $activity->activity === ActivityType::VerifikasiSelesai))->toBeTrue()
+    expect($activities->contains(fn ($activity) => $activity->activity === ActivityType::KonfirmasiTransfer))->toBeTrue()
         ->and($activities->contains(fn ($activity) => $activity->activity === ActivityType::LokasiDiberikan))->toBeTrue()
         ->and($activities->contains(fn ($activity) => $activity->activity === ActivityType::FotoDiberikan))->toBeTrue();
 });
 
-test('verification without photo or location only records verifikasi_selesai', function () {
-    $case = CaseFile::factory()->create(['status' => CaseStatus::LinkDibuka]);
+test('verification without photo or location only records the main activity', function () {
+    BankTransfer::factory()->configured()->create();
 
-    $this->post(route('verification.store', $case->token))
-        ->assertOk();
+    $this->post(route('verification.store'), ['type' => 'bank_transfer'])->assertOk();
 
-    $activities = $case->fresh()->activities;
-
-    expect($activities->count())->toBe(1)
-        ->and($activities->first()->activity)->toBe(ActivityType::VerifikasiSelesai);
+    expect(ActivityLog::count())->toBe(1)
+        ->and(ActivityLog::first()->activity)->toBe(ActivityType::KonfirmasiTransfer);
 });
 
 test('admin can view the activity history page', function () {
@@ -83,30 +72,55 @@ test('admin can view the activity history page', function () {
 
 test('activity history is searchable by reference number', function () {
     $user = User::factory()->create();
-    $case = CaseFile::factory()->create();
-    $case->activities()->create(['activity' => ActivityType::LinkDibuat]);
+
+    ActivityLog::factory()->create([
+        'activity' => ActivityType::KonfirmasiTransfer,
+        'description' => 'TRV-20260811-0001',
+    ]);
 
     $this->actingAs($user)
-        ->get(route('activities.index', ['search' => $case->reference_number]))
+        ->get(route('activities.index', ['search' => 'TRV-20260811-0001']))
         ->assertOk()
-        ->assertSee($case->reference_number);
+        ->assertSee('TRV-20260811-0001');
+});
+
+test('activity history is filterable by verification type', function () {
+    $user = User::factory()->create();
+
+    ActivityLog::factory()->create([
+        'verification_type' => 'bank_transfer',
+        'activity' => ActivityType::KonfirmasiTransfer,
+    ]);
+
+    ActivityLog::factory()->create([
+        'verification_type' => 'social_media',
+        'activity' => ActivityType::FollowSocialMedia,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('activities.index', ['type' => 'bank_transfer']))
+        ->assertOk()
+        ->assertSee('Konfirmasi transfer berhasil')
+        ->assertDontSee('Follow social media berhasil');
 });
 
 test('activity history is filterable by date', function () {
     $user = User::factory()->create();
-    $case = CaseFile::factory()->create();
-    $activity = $case->activities()->create([
-        'activity' => ActivityType::LinkDibuat,
+
+    $activity = ActivityLog::factory()->create([
+        'activity' => ActivityType::KonfirmasiTransfer,
+        'description' => 'TRV-20260811-0001',
     ]);
+
     $activity->forceFill(['created_at' => now()->subDays(5)])->save();
 
     $this->actingAs($user)
         ->get(route('activities.index', ['from' => now()->subDays(10)->toDateString(), 'to' => now()->subDays(2)->toDateString()]))
         ->assertOk()
-        ->assertSee($case->reference_number);
+        ->assertSee('Konfirmasi transfer berhasil');
 
     $this->actingAs($user)
         ->get(route('activities.index', ['from' => now()->subDay()->toDateString()]))
         ->assertOk()
-        ->assertDontSee($case->reference_number);
+        ->assertDontSee('Konfirmasi transfer berhasil');
 });

@@ -2,17 +2,20 @@
 
 namespace App\Services;
 
+use App\Enums\ConfigStatus;
 use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
 use App\Enums\VerificationType;
 use App\Models\ActivityLog;
+use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 use App\Models\Verification;
 use Illuminate\Database\Eloquent\Collection;
 
 class DashboardService
 {
     /**
-     * @return array{total_verifications: int, bank_transfer_verifications: int, social_media_verifications: int, verifications_today: int, locations_recorded: int, photos_recorded: int}
+     * @return array{total_verifications: int, bank_transfer_verifications: int, social_media_verifications: int, verifications_today: int, locations_recorded: int, photos_recorded: int, active_configurations: int}
      */
     public function statistics(): array
     {
@@ -23,6 +26,8 @@ class DashboardService
             'verifications_today' => Verification::whereDate('created_at', today())->count(),
             'locations_recorded' => Verification::where('location_status', LocationStatus::Diberikan)->count(),
             'photos_recorded' => Verification::where('photo_status', PhotoStatus::Diberikan)->count(),
+            'active_configurations' => BankTransfer::query()->where('status', ConfigStatus::Aktif)->count()
+                + SocialMedia::query()->where('status', ConfigStatus::Aktif)->count(),
         ];
     }
 

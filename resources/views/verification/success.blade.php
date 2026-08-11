@@ -6,8 +6,12 @@
 
     <dl class="mt-6 grid grid-cols-1 gap-4">
         <div>
-            <dt class="text-sm font-medium text-gray-500">No. Referensi Kasus</dt>
-            <dd class="mt-1 font-mono text-sm">{{ $case->reference_number }}</dd>
+            <dt class="text-sm font-medium text-gray-500">No. Referensi</dt>
+            <dd class="mt-1 font-mono text-sm">{{ $verification->reference_number }}</dd>
+        </div>
+        <div>
+            <dt class="text-sm font-medium text-gray-500">Jenis Verifikasi</dt>
+            <dd class="mt-1 text-sm">{{ $verification->verification_type->label() }}</dd>
         </div>
         <div>
             <dt class="text-sm font-medium text-gray-500">Waktu Verifikasi</dt>
