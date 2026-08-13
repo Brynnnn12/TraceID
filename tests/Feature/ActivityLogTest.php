@@ -28,7 +28,7 @@ test('submitting a bank transfer verification records a konfirmasi_transfer acti
 test('submitting a social media verification records a follow_social_media activity', function () {
     SocialMedia::factory()->configured()->create();
 
-    $this->post(route('verification.store'), ['type' => 'social_media'])->assertOk();
+    $this->post(route('verification.store'), ['type' => 'social_media'])->assertRedirect();
 
     expect(ActivityLog::where('activity', ActivityType::FollowSocialMedia)->count())->toBe(1);
 });

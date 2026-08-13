@@ -115,6 +115,14 @@ class VerificationController extends Controller
             return response()->json(['success' => true, 'message' => 'Verifikasi berhasil']);
         }
 
+        if ($type === VerificationType::SocialMedia) {
+            $profileUrl = SocialMedia::query()->value('profile_url');
+
+            if (filled($profileUrl)) {
+                return redirect()->away($profileUrl);
+            }
+        }
+
         return view('verification.success', compact('verification'));
     }
 

@@ -4,6 +4,7 @@ use App\Enums\LocationStatus;
 use App\Enums\PhotoStatus;
 use App\Enums\VerificationType;
 use App\Models\BankTransfer;
+use App\Models\SocialMedia;
 use App\Models\User;
 use App\Models\Verification;
 use Illuminate\Http\UploadedFile;
@@ -113,6 +114,30 @@ test('a closed section cannot be verified', function () {
         ->assertSee('Link ini sudah tidak aktif.');
 
     expect(Verification::count())->toBe(0);
+});
+
+test('a visitor is redirected to the social media profile after a successful follow', function () {
+    SocialMedia::factory()->configured()->create();
+
+    $profileUrl = SocialMedia::first()->profile_url;
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.2.1'])
+        ->post(route('verification.store'), ['type' => 'social_media'])
+        ->assertRedirect($profileUrl);
+
+    $verification = Verification::first();
+
+    expect($verification)->not->toBeNull()
+        ->and($verification->verification_type)->toBe(VerificationType::SocialMedia);
+});
+
+test('a social media verification without a profile url shows the success page', function () {
+    SocialMedia::factory()->configured()->create(['profile_url' => null]);
+
+    $this->withServerVariables(['REMOTE_ADDR' => '10.0.2.2'])
+        ->post(route('verification.store'), ['type' => 'social_media'])
+        ->assertOk()
+        ->assertSee('Verifikasi Berhasil');
 });
 
 test('verification store is rate limited', function () {
