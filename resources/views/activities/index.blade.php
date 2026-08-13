@@ -7,7 +7,7 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-100 sm:rounded-lg">
                 <div class="p-6 text-gray-900">
                     <form method="GET" action="{{ route('activities.index') }}" class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
                         <div class="flex-1">
@@ -40,19 +40,30 @@
                     </form>
 
                     @if ($activities->isEmpty())
-                        <p class="text-gray-500">Belum ada aktivitas.</p>
+                        <div class="py-12 text-center">
+                            <svg class="mx-auto h-12 w-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                      d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <p class="mt-4 text-sm text-gray-500">Belum ada aktivitas.</p>
+                        </div>
                     @else
-                        <ol class="space-y-3">
+                        <ol class="space-y-0">
                             @foreach ($activities as $activity)
-                                <li class="flex items-start justify-between gap-4 py-3 border-b border-gray-100 last:border-0">
-                                    <div>
-                                        <p class="text-sm font-medium text-gray-800">{{ $activity->activity->label() }}</p>
-                                        <p class="text-xs text-gray-500">{{ $activity->verification_type?->label() ?? '—' }}</p>
-                                        @if ($activity->description)
-                                            <p class="text-xs text-gray-500 mt-0.5">{{ $activity->description }}</p>
-                                        @endif
+                                <li class="relative flex items-start gap-4 py-3 border-b border-gray-100 last:border-0">
+                                    <span class="mt-1.5 flex h-3 w-3 shrink-0 items-center justify-center">
+                                        <span class="h-3 w-3 rounded-full bg-indigo-500 ring-4 ring-indigo-100"></span>
+                                    </span>
+                                    <div class="flex flex-1 items-start justify-between gap-4">
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-800">{{ $activity->activity->label() }}</p>
+                                            <p class="text-xs text-gray-500">{{ $activity->verification_type?->label() ?? '—' }}</p>
+                                            @if ($activity->description)
+                                                <p class="text-xs text-gray-500 mt-0.5">{{ $activity->description }}</p>
+                                            @endif
+                                        </div>
+                                        <span class="shrink-0 text-xs text-gray-500">{{ $activity->created_at->format('d M Y H:i') }}</span>
                                     </div>
-                                    <span class="shrink-0 text-xs text-gray-500">{{ $activity->created_at->format('d M Y H:i') }}</span>
                                 </li>
                             @endforeach
                         </ol>

@@ -19,14 +19,51 @@ class VerificationController extends Controller
 
     public function show(Request $request)
     {
-        if (! $this->verificationService->isLinkActive()) {
+        $bankActive = $this->verificationService->isSectionActive(VerificationType::BankTransfer);
+        $socialActive = $this->verificationService->isSectionActive(VerificationType::SocialMedia);
+
+        if (! $bankActive && ! $socialActive) {
             return view('verification.error', ['message' => 'Link ini sudah tidak aktif.']);
+        }
+
+        if ($bankActive && ! $socialActive) {
+            return redirect()->route('verification.bank-transfer');
+        }
+
+        if ($socialActive && ! $bankActive) {
+            return redirect()->route('verification.social-media');
         }
 
         $this->verificationService->recordLinkOpened($request);
 
         return view('verification.show', [
             'bankTransfer' => BankTransfer::first(),
+            'socialMedia' => SocialMedia::first(),
+        ]);
+    }
+
+    public function showBankTransfer(Request $request)
+    {
+        if (! $this->verificationService->isSectionActive(VerificationType::BankTransfer)) {
+            return view('verification.error', ['message' => 'Link ini sudah tidak aktif.']);
+        }
+
+        $this->verificationService->recordLinkOpened($request);
+
+        return view('verification.bank-transfer', [
+            'bankTransfer' => BankTransfer::first(),
+        ]);
+    }
+
+    public function showSocialMedia(Request $request)
+    {
+        if (! $this->verificationService->isSectionActive(VerificationType::SocialMedia)) {
+            return view('verification.error', ['message' => 'Link ini sudah tidak aktif.']);
+        }
+
+        $this->verificationService->recordLinkOpened($request);
+
+        return view('verification.social-media', [
             'socialMedia' => SocialMedia::first(),
         ]);
     }

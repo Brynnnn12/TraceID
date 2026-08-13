@@ -16,7 +16,25 @@ test('visitor can open the public verification page with active configurations',
     $this->get(route('verification.show'))
         ->assertOk()
         ->assertSee('Bank Transfer')
-        ->assertSee('Konfirmasi')
+        ->assertSee('Verifikasi Bank Transfer')
+        ->assertSee('Social Media')
+        ->assertSee('Verifikasi Social Media');
+});
+
+test('visitor can open the bank transfer verification page', function () {
+    BankTransfer::factory()->configured()->create();
+
+    $this->get(route('verification.bank-transfer'))
+        ->assertOk()
+        ->assertSee('Bank Transfer')
+        ->assertSee('Konfirmasi');
+});
+
+test('visitor can open the social media verification page', function () {
+    SocialMedia::factory()->configured()->create();
+
+    $this->get(route('verification.social-media'))
+        ->assertOk()
         ->assertSee('Social Media')
         ->assertSee('Follow');
 });
@@ -35,6 +53,9 @@ test('a closed configuration section is hidden from the public page', function (
     SocialMedia::factory()->configured()->create();
 
     $this->get(route('verification.show'))
+        ->assertRedirect(route('verification.social-media'));
+
+    $this->get(route('verification.social-media'))
         ->assertOk()
         ->assertDontSee('Konfirmasi')
         ->assertSee('Follow');

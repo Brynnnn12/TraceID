@@ -1,10 +1,13 @@
 <x-app-layout>
     <x-slot name="header">
         <div class="flex items-center justify-between">
-            <h2 class="font-semibold text-xl text-gray-800 leading-tight">
+            <h2 class="font-mono font-semibold text-xl text-gray-800 leading-tight">
                 {{ $verification->reference_number }}
             </h2>
-            <a href="{{ route('verifications.index') }}" class="text-sm font-medium text-indigo-600 hover:text-indigo-900">
+            <a href="{{ route('verifications.index') }}" class="inline-flex items-center gap-1 text-sm font-medium text-indigo-600 hover:text-indigo-900">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+                </svg>
                 {{ __('Kembali') }}
             </a>
         </div>
@@ -15,14 +18,15 @@
             <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <div class="space-y-6">
                     @if ($photos->isNotEmpty())
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-100 sm:rounded-lg">
                             <div class="p-6">
                                 <h3 class="text-lg font-medium text-gray-900">Foto</h3>
                                 <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
                                     @foreach ($photos as $photo)
-                                        <a href="{{ $photo['url'] }}" target="_blank" rel="noopener">
+                                        <a href="{{ $photo['url'] }}" target="_blank" rel="noopener"
+                                           class="group block overflow-hidden rounded-lg border border-gray-200">
                                             <img src="{{ $photo['url'] }}" alt="Foto verifikasi {{ $loop->iteration }}"
-                                                 class="h-40 w-full rounded-lg border border-gray-200 object-cover">
+                                                 class="h-40 w-full object-cover transition group-hover:scale-105">
                                         </a>
                                     @endforeach
                                 </div>
@@ -31,7 +35,7 @@
                     @endif
 
                     @if ($verification->hasCoordinates())
-                        <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                        <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-100 sm:rounded-lg">
                             <div class="p-6">
                                 <h3 class="text-lg font-medium text-gray-900">Lokasi</h3>
                                 <div class="z-0 mt-4 h-56 rounded-lg"
@@ -41,7 +45,7 @@
                     @endif
                 </div>
 
-                <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="bg-white overflow-hidden shadow-sm ring-1 ring-gray-100 sm:rounded-lg">
                     <div class="p-6">
                         <h3 class="text-lg font-medium text-gray-900">Detail Verifikasi</h3>
 
@@ -86,7 +90,7 @@
                 </div>
             </div>
 
-            <div class="mt-6 bg-white overflow-hidden shadow-sm sm:rounded-lg">
+            <div class="mt-6 bg-white overflow-hidden shadow-sm ring-1 ring-gray-100 sm:rounded-lg">
                 <div class="p-6">
                     <h3 class="text-lg font-medium text-gray-900">Metadata Perangkat</h3>
 

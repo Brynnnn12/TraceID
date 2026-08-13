@@ -13,6 +13,7 @@ use App\Models\SocialMedia;
 use App\Models\Verification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -22,12 +23,6 @@ class VerificationService
         private readonly PhotoService $photoService,
         private readonly ActivityService $activityService,
     ) {}
-
-    public function isLinkActive(): bool
-    {
-        return $this->hasActiveConfig(BankTransfer::query())
-            || $this->hasActiveConfig(SocialMedia::query());
-    }
 
     public function isSectionActive(VerificationType $type): bool
     {
@@ -123,7 +118,7 @@ class VerificationService
     }
 
     /**
-     * @return list<\Illuminate\Http\UploadedFile>
+     * @return list<UploadedFile>
      */
     private function photosFrom(Request $request): array
     {

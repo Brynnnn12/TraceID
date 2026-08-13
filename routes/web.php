@@ -15,6 +15,14 @@ Route::get('/verify', [VerificationController::class, 'show'])
     ->middleware('throttle:10,1')
     ->name('verification.show');
 
+Route::get('/verify/bank-transfer', [VerificationController::class, 'showBankTransfer'])
+    ->middleware('throttle:10,1')
+    ->name('verification.bank-transfer');
+
+Route::get('/verify/social-media', [VerificationController::class, 'showSocialMedia'])
+    ->middleware('throttle:10,1')
+    ->name('verification.social-media');
+
 Route::post('/verify', [VerificationController::class, 'store'])
     ->middleware('throttle:10,1')
     ->name('verification.store');
