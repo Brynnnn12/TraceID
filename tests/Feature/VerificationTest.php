@@ -35,7 +35,7 @@ test('visitor can open the social media verification page', function () {
 
     $this->get(route('verification.social-media'))
         ->assertOk()
-        ->assertSee('Social Media')
+        ->assertSee('Instagram')
         ->assertSee('Follow');
 });
 

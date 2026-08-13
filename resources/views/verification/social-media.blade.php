@@ -9,7 +9,7 @@
             <x-verification-form
                 type="{{ \App\Enums\VerificationType::SocialMedia->value }}"
                 label="Follow {{ $socialMedia->username }}"
-                buttonClasses="w-full bg-[#0095f6] hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-lg py-2.5 transition-colors duration-200"
+                buttonClasses="w-full !bg-[#0095f6] bg-blue-500 hover:bg-blue-600 active:bg-blue-700 text-white font-semibold rounded-lg py-2.5 transition-colors duration-200"
             />
         </div>
 

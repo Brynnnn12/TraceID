@@ -28,7 +28,7 @@
     </div>
 
     <!-- Post Content / Link Area -->
-    <div class="relative flex aspect-square w-full items-center justify-center bg-gray-50 border-y border-gray-100 group">
+    <div class="relative flex aspect-square min-h-80 w-full items-center justify-center bg-gray-50 border-y border-gray-100 group">
         <a href="{{ $config->profile_url }}" target="_blank" rel="noopener" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center hover:bg-black/5 transition-colors">
             <svg class="h-12 w-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
